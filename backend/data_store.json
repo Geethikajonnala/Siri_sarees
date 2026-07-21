@@ -1,0 +1,24 @@
+{
+  "admins": [
+    {
+      "id": "local-admin",
+      "username": "admin",
+      "email": "admin@sirisarees.com",
+      "password_hash": "scrypt:32768:8:1$CZXWl3HR8SOjrILN$a937f20484fd1aecb8020596c83420794da8f62acd6c5acba288d8be5e130ccdea1faea4fe43c1f7ec111539b2abb9af5bd7a53cae305eae6364210ebcf04083"
+    }
+  ],
+  "products": [
+    {
+      "name": "silk",
+      "category": "silkkk",
+      "description": "",
+      "price": 1000.0,
+      "offer": "20",
+      "stock": 10,
+      "image_url": "/uploads/acc9bb943f4d4eb5ae6abe3ed42aae0c_Screenshot_2026-07-13_175218.png",
+      "created_at": "2026-07-19T07:26:32.586727+00:00",
+      "updated_at": "2026-07-19T07:26:32.586727+00:00",
+      "id": "5c899c28-46c5-4d49-9517-49d43a7ca0a2"
+    }
+  ]
+}

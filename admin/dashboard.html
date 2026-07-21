@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Siri Sarees Admin</title>
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="admin-layout">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">SS</div>
+          <div>
+            <h2>Siri Sarees</h2>
+            <p>Admin Panel</p>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a href="dashboard.html" class="active">Dashboard</a>
+          <a href="products.html">Products</a>
+          <a href="add-product.html">Add Product</a>
+          <a href="login.html">Logout</a>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <h1>Siri Sarees Admin</h1>
+          <div class="topbar-chip">Welcome back</div>
+        </header>
+
+        <section class="stats-grid">
+          <article class="stat-card">
+            <span class="stat-label">Total Products</span>
+            <strong>128</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Categories</span>
+            <strong>8</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Low Stock</span>
+            <strong>12</strong>
+          </article>
+        </section>
+
+        <section class="panel-card">
+          <div class="panel-header">
+            <h3>Recent Products</h3>
+            <a href="products.html" class="text-link">View all</a>
+          </div>
+
+          <div class="product-list">
+            <div class="product-item">
+              <div class="product-thumb">K</div>
+              <div>
+                <h4>Kanchipuram Silk</h4>
+                <p>Premium weave</p>
+              </div>
+              <span class="stock-badge">In Stock</span>
+            </div>
+            <div class="product-item">
+              <div class="product-thumb">B</div>
+              <div>
+                <h4>Banarasi Bridal</h4>
+                <p>Festive collection</p>
+              </div>
+              <span class="stock-badge low">Low stock</span>
+            </div>
+            <div class="product-item">
+              <div class="product-thumb">C</div>
+              <div>
+                <h4>Chiffon Elegance</h4>
+                <p>Lightweight comfort</p>
+              </div>
+              <span class="stock-badge">In Stock</span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="admin.js"></script>
+  </body>
+</html>

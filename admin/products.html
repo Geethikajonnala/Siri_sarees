@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Products | Siri Sarees Admin</title>
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="admin-layout">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">SS</div>
+          <div>
+            <h2>Siri Sarees</h2>
+            <p>Admin Panel</p>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a href="dashboard.html">Dashboard</a>
+          <a href="products.html" class="active">Products</a>
+          <a href="add-product.html">Add Product</a>
+          <a href="login.html">Logout</a>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <h1>Products</h1>
+          <a href="add-product.html" class="btn btn-primary">Add New Product</a>
+        </header>
+
+        <section class="panel-card">
+          <div class="panel-header">
+            <h3>Product Inventory</h3>
+            <p>Loading products from the backend...</p>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Image</th>
+                  <th>Name</th>
+                  <th>Category</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div class="product-thumb small">K</div></td>
+                  <td>Kanchipuram Silk</td>
+                  <td>Silk</td>
+                  <td>₹18,500</td>
+                  <td>24</td>
+                  <td>
+                    <div class="action-group">
+                      <a href="edit-product.html" class="btn btn-secondary">Edit</a>
+                      <button type="button" class="btn btn-muted">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><div class="product-thumb small">B</div></td>
+                  <td>Banarasi Bridal</td>
+                  <td>Bridal</td>
+                  <td>₹22,000</td>
+                  <td>8</td>
+                  <td>
+                    <div class="action-group">
+                      <a href="edit-product.html" class="btn btn-secondary">Edit</a>
+                      <button type="button" class="btn btn-muted">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><div class="product-thumb small">C</div></td>
+                  <td>Chiffon Elegance</td>
+                  <td>Chiffon</td>
+                  <td>₹6,800</td>
+                  <td>31</td>
+                  <td>
+                    <div class="action-group">
+                      <a href="edit-product.html" class="btn btn-secondary">Edit</a>
+                      <button type="button" class="btn btn-muted">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="admin.js"></script>
+  </body>
+</html>
