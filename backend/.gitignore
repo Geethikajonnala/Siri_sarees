@@ -1,0 +1,70 @@
+# ==========================
+# Python
+# ==========================
+.venv/
+venv/
+env/
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environment files
+.pytest_cache/
+.mypy_cache/
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.*
+backend/.env
+
+# ==========================
+# Database Files
+# ==========================
+*.db
+*.sqlite3
+
+# ==========================
+# Python Cache
+# ==========================
+backend/__pycache__/
+backend/tests/__pycache__/
+
+# ==========================
+# Uploads (Generated Files)
+# ==========================
+backend/uploads/
+
+# ==========================
+# Cookies & Local Data
+# ==========================
+backend/cookiejar.txt
+backend/data_store.json
+
+# ==========================
+# Node.js
+# ==========================
+node_modules/
+.next/
+dist/
+build/
+
+# ==========================
+# Logs
+# ==========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# ==========================
+# VS Code
+# ==========================
+.vscode/
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+Thumbs.db
