@@ -35,7 +35,7 @@
       <section class="panel-card form-card">
         <div class="panel-header">
           <h3>New Product Details</h3>
-          <p>Frontend-only form placeholder.</p>
+          <p>This saree is published to the live storefront immediately after saving.</p>
         </div>
 
         <form class="product-form">
@@ -68,12 +68,12 @@
             <input type="text" name="offer" placeholder="e.g. 10% off" />
           </label>
 
-          <label>
-            Image Upload
-            <input type="file" name="image" accept="image/png,image/jpeg,image/webp" multiple />
-            <div class="selected-files"
-              style="margin-top: 5px; font-size: 0.9em; color: var(--muted); font-weight: normal;"></div>
-          </label>
+          <p style="margin: 0 0 8px; font-weight: 600;">Product Images
+            <span style="font-weight: normal; font-size: 0.85em; color: var(--muted);">&mdash; the first box is the main photo shown to customers</span>
+          </p>
+          <div class="image-slot-grid" id="imageSlotGrid"></div>
+          <p class="image-count-hint" id="imageSlotHint" style="margin: -8px 0 16px; font-size: 0.85em; color: var(--muted);"></p>
+          <input type="file" id="slotFileInput" accept="image/png,image/jpeg,image/webp" hidden />
 
           <p class="form-status" aria-live="polite"></p>
           <button type="submit" class="btn btn-primary">Save Product</button>

@@ -16,6 +16,7 @@ from supabase_client import supabase
 api = Blueprint("api", __name__)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 IMAGE_BUCKET = "saree_images"
+MAX_PRODUCT_IMAGES = 4
 
 
 def _json_error(message: str, status: int = 400):
@@ -46,6 +47,26 @@ def _build_product_payload(product: Product):
     payload["images"] = [_build_image_url(url) for url in image_list]
     payload["image_url"] = payload["images"][0] if payload["images"] else ""
     return payload
+
+
+def _storage_path_from_url(url: str):
+    marker = f"/object/public/{IMAGE_BUCKET}/"
+    index = (url or "").find(marker)
+    if index == -1:
+        return None
+    return url[index + len(marker):]
+
+
+def _delete_storage_images(urls):
+    paths = [path for path in (_storage_path_from_url(url) for url in urls) if path]
+    if not paths:
+        return
+    try:
+        supabase.storage.from_(IMAGE_BUCKET).remove(paths)
+    except Exception as exc:
+        # Best-effort cleanup: the product record change already succeeded, so a
+        # storage hiccup here shouldn't fail the request - just leave a trace.
+        current_app.logger.warning("Failed to delete storage image(s) %s: %s", paths, exc)
 
 
 FABRIC_TERMS = (
@@ -135,7 +156,7 @@ def _save_uploaded_image(uploaded_file):
     return supabase.storage.from_(IMAGE_BUCKET).get_public_url(storage_path)
 
 
-def _get_uploaded_images():
+def _get_uploaded_images(limit=MAX_PRODUCT_IMAGES):
     uploaded_files = []
     uploaded_files.extend(request.files.getlist("image"))
     uploaded_files.extend(request.files.getlist("images"))
@@ -144,8 +165,8 @@ def _get_uploaded_images():
     for uploaded_file in uploaded_files:
         if not uploaded_file or not uploaded_file.filename:
             continue
-        if len(image_urls) >= 3:
-            return None, "A product can have up to 3 images"
+        if len(image_urls) >= limit:
+            return None, f"A product can have up to {MAX_PRODUCT_IMAGES} images in total"
         image_url = _save_uploaded_image(uploaded_file)
         if image_url is None:
             return None, "Only JPG, PNG, and WEBP images are supported"
@@ -483,16 +504,6 @@ def update_product(product_id):
                 payload[field] = _normalize_text(value)
 
     try:
-        uploaded_images, upload_error = _get_uploaded_images()
-    except Exception as exc:
-        current_app.logger.warning("Supabase image upload failed: %s", exc)
-        return _json_error(f"Unable to upload image: {exc}", 500)
-    if upload_error:
-        return _json_error(upload_error, 400)
-    if uploaded_images:
-        payload["image_url"] = ",".join(uploaded_images)
-
-    try:
         product = Product.get_product(product_id)
     except Exception as exc:
         return _json_error(f"Unable to load product: {exc}", 500)
@@ -500,7 +511,55 @@ def update_product(product_id):
     if not product:
         return _json_error("Product not found", 404)
 
-    if not payload and not uploaded_images:
+    current_images = _build_product_payload(product).get("images", [])
+
+    # `keep_images` lists which of the product's existing images the admin kept
+    # (its per-image "x" button removes one), in left-to-right slot order.
+    # `image_order` is a comma list of MAX_PRODUCT_IMAGES tokens ("keep"/"new"/"empty"),
+    # one per image slot in the admin UI, so a newly uploaded photo dropped into the
+    # first slot is respected as the main image instead of always trailing the kept
+    # ones. Without it (older/other callers) we fall back to keep-then-append.
+    keep_images_raw = data.get("keep_images")
+    images_requested = keep_images_raw is not None
+    if images_requested:
+        keep_urls = [url.strip() for url in keep_images_raw.split(",") if url.strip()]
+        keep_urls = [url for url in keep_urls if url in current_images]
+    else:
+        keep_urls = list(current_images)
+
+    remaining_slots = MAX_PRODUCT_IMAGES - len(keep_urls)
+    if remaining_slots < 0:
+        return _json_error(f"A product can have up to {MAX_PRODUCT_IMAGES} images in total", 400)
+
+    try:
+        uploaded_images, upload_error = _get_uploaded_images(limit=remaining_slots)
+    except Exception as exc:
+        current_app.logger.warning("Supabase image upload failed: %s", exc)
+        return _json_error(f"Unable to upload image: {exc}", 500)
+    if upload_error:
+        return _json_error(upload_error, 400)
+
+    final_images = current_images
+    if images_requested or uploaded_images:
+        order_raw = data.get("image_order")
+        if order_raw:
+            keep_iter = iter(keep_urls)
+            new_iter = iter(uploaded_images)
+            final_images = []
+            for token in (t.strip() for t in order_raw.split(",")):
+                if token == "keep":
+                    url = next(keep_iter, None)
+                    if url:
+                        final_images.append(url)
+                elif token == "new":
+                    url = next(new_iter, None)
+                    if url:
+                        final_images.append(url)
+        else:
+            final_images = keep_urls + uploaded_images
+        payload["image_url"] = ",".join(final_images)
+
+    if not payload:
         return _json_error("No valid fields to update", 400)
 
     for field, value in payload.items():
@@ -510,6 +569,9 @@ def update_product(product_id):
     try:
         db.session.add(product)
         db.session.commit()
+        removed_images = [url for url in current_images if url not in final_images]
+        if removed_images:
+            _delete_storage_images(removed_images)
         return jsonify({"success": True, "message": "Product updated", "product": _build_product_payload(product)})
     except Exception as exc:
         db.session.rollback()
@@ -528,9 +590,13 @@ def delete_product(product_id):
     if not product:
         return _json_error("Product not found", 404)
 
+    product_images = _build_product_payload(product).get("images", [])
+
     try:
         db.session.delete(product)
         db.session.commit()
+        if product_images:
+            _delete_storage_images(product_images)
         return jsonify({"success": True, "message": "Product deleted"})
     except Exception as exc:
         db.session.rollback()

@@ -1,57 +1,23 @@
 let products = [];
 
-function resolveProductImageUrl(imageUrl) {
-  const fallbackImage = "https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700";
-  const normalizedUrl = (imageUrl || "").toString().trim();
-  const apiOrigin = "http://127.0.0.1:5000";
-  const supabaseUrl = (window.SSD_CONFIG?.SUPABASE_URL || "").replace(/\/$/, "");
-  const supabaseBucket = window.SSD_CONFIG?.SUPABASE_BUCKET || "saree_images";
-
-  if (!normalizedUrl) return fallbackImage;
-  if (/^https?:\/\//i.test(normalizedUrl)) {
-    const url = new URL(normalizedUrl);
-    if (url.origin === apiOrigin && url.pathname.startsWith("/uploads/")) {
-      return `${apiOrigin}/api${url.pathname}`;
-    }
-    return normalizedUrl;
-  }
-  if (normalizedUrl.startsWith("/uploads/")) return `${apiOrigin}/api${normalizedUrl}`;
-  if (normalizedUrl.startsWith("uploads/")) return `${apiOrigin}/api/${normalizedUrl}`;
-  if (supabaseUrl && !normalizedUrl.startsWith("/") && !normalizedUrl.startsWith("storage/")) {
-    return `${supabaseUrl}/storage/v1/object/public/${supabaseBucket}/${normalizedUrl}`;
-  }
-  if (normalizedUrl.startsWith("/")) return `${apiOrigin}${normalizedUrl}`;
-  return `${apiOrigin}/${normalizedUrl}`;
-}
-
-function productImageUrls(product) {
-  const urls = Array.isArray(product.images) && product.images.length > 0
-    ? product.images
-    : [product.image || product.image_url];
-  return urls.map(resolveProductImageUrl).filter(Boolean).slice(0, 4);
-}
-
 async function loadProductsFromBackend() {
   try {
-    const response = await fetch("http://127.0.0.1:5000/api/products");
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "Unable to load products");
-    products = (result.products || []).map((product) => {
-      const images = (Array.isArray(product.images) ? product.images : []).map(resolveProductImageUrl).filter(Boolean).slice(0, 4);
-      const image = images[0] || resolveProductImageUrl(product.image_url || "https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700");
+    const backendProducts = await ssdFetchAllProducts();
+    products = backendProducts.map((product) => {
+      const images = ssdProductImages(product);
       return {
         ...product,
         id: product.id,
         name: product.name,
         category: product.category,
         price: Number(product.price),
-        image,
-        images: images.length > 0 ? images : [image],
-        description: product.description || "Premium saree from Siri Sarees.",
-        colors: ["Classic", "Elegant"],
-        sizes: ["Regular Saree (5.5 Meters)"]
+        offer: product.offer || "",
+        image: images[0],
+        images,
+        description: product.description || "Premium saree from Siri Sarees."
       };
     });
+    ssdEnsureProducts([], products);
     return products;
   } catch (error) {
     console.error(error);
@@ -242,48 +208,12 @@ const selectors = {
   quickViewContent: document.querySelector("#quickViewContent")
 };
 
-const storeKeys = {
-  wishlist: "siriSareesWishlist",
-  cart: "siriSareesCart"
-};
-
-let wishlist = readStore(storeKeys.wishlist, []);
-let cart = readStore(storeKeys.cart, []);
+let wishlist = ssdGetWishlist();
+let cart = ssdGetCart();
 let visibleMoreCount = 6;
 
-function readStore(key, fallback) {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStore(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function formatPrice(value) {
-  return `Rs. ${value.toLocaleString("en-IN")}`;
-}
-
-function getPublicSiteBaseUrl() {
-  const configuredUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "").trim();
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-
-  if (window.location.origin && window.location.origin !== "null") {
-    return window.location.origin.replace(/\/$/, "");
-  }
-
-  return "http://127.0.0.1:5000";
-}
-
-function getProductUrl(id) {
-  const productBaseUrl = getPublicSiteBaseUrl();
-  const productUrl = new URL("product.html", `${productBaseUrl}/`);
-  productUrl.searchParams.set("id", id);
-  return productUrl.href;
-}
+const formatPrice = ssdFormatPrice;
+const getProductUrl = ssdProductUrl;
 
 function productById(id) {
   return products.find((product) => product.id === id);
@@ -318,18 +248,21 @@ function updateBadge(badge, value) {
 
 function productCard(product) {
   const wished = wishlist.includes(product.id);
-  const imageUrl = productImageUrls(product)[0];
-  console.log("[product-image]", imageUrl);
+  const imageUrl = ssdProductImages(product)[0];
+  const name = product.name || "Siri Saree";
+  const { discountPercent } = ssdPriceBreakdown(product);
+  const offerBadge = discountPercent > 0 ? `<span class="offer-badge">${discountPercent}% OFF</span>` : "";
   return `
-    <article class="product-card reveal visible" data-id="${product.id}" tabindex="0" aria-label="View ${product.name}">
-      <button class="wishlist-btn ${wished ? "active" : ""}" type="button" data-wishlist="${product.id}" aria-label="${wished ? "Remove" : "Add"} ${product.name} ${wished ? "from" : "to"} wishlist">
+    <article class="product-card reveal visible" data-id="${product.id}" tabindex="0" aria-label="View ${name}">
+      ${offerBadge}
+      <button class="wishlist-btn ${wished ? "active" : ""}" type="button" data-wishlist="${product.id}" aria-label="${wished ? "Remove" : "Add"} ${name} ${wished ? "from" : "to"} wishlist">
         <i class="${wished ? "fa-solid" : "fa-regular"} fa-heart"></i>
       </button>
-      <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
       <div class="product-info">
-        <p class="product-category">${product.category}</p>
-        <h3>${product.name}</h3>
-        <p class="price">${formatPrice(product.price)}</p>
+        <p class="product-category">${product.category || "Siri Saree Divine"}</p>
+        <h3>${name}</h3>
+        <p class="price">${ssdPriceMarkup(product)}</p>
         <div class="product-actions">
           <button class="quick-view" type="button" data-quick-view="${product.id}">Quick View</button>
           <button class="order-now-btn" type="button" data-order-now="${product.id}">
@@ -419,16 +352,17 @@ function closeMoreCollections() {
 function renderWishlist() {
   const wishlistProducts = wishlist.map(productById).filter(Boolean);
   selectors.wishlistItems.innerHTML = wishlistProducts.map((product) => {
-    const imageUrl = productImageUrls(product)[0];
+    const imageUrl = ssdProductImages(product)[0];
+    const name = product.name || "Siri Saree";
     return `
     <div class="panel-item">
-      <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
       <div>
-        <h3>${product.name}</h3>
-        <p>${product.category}</p>
-        <strong>${formatPrice(product.price)}</strong>
+        <h3>${name}</h3>
+        <p>${product.category || "Siri Saree Divine"}</p>
+        <strong>${formatPrice(ssdFinalPrice(product))}</strong>
       </div>
-      <button class="remove-btn" type="button" data-remove-wishlist="${product.id}" aria-label="Remove ${product.name} from wishlist">
+      <button class="remove-btn" type="button" data-remove-wishlist="${product.id}" aria-label="Remove ${name} from wishlist">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
@@ -437,22 +371,23 @@ function renderWishlist() {
 
   selectors.wishlistEmpty.classList.toggle("visible", wishlist.length === 0);
   updateBadge(selectors.wishlistCount, wishlist.length);
-  writeStore(storeKeys.wishlist, wishlist);
+  ssdSetWishlist(wishlist);
 }
 
 function renderCart() {
   const cartItems = cart.map((item) => ({ ...item, product: productById(item.id) })).filter((item) => item.product);
   selectors.cartItems.innerHTML = cartItems.map(({ product, quantity }) => {
-    const imageUrl = productImageUrls(product)[0];
+    const imageUrl = ssdProductImages(product)[0];
+    const name = product.name || "Siri Saree";
     return `
     <div class="panel-item cart-item">
-      <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
       <div>
-        <h3>${product.name}</h3>
+        <h3>${name}</h3>
         <p>Quantity: ${quantity}</p>
-        <strong>${formatPrice(product.price * quantity)}</strong>
+        <strong>${formatPrice(ssdFinalPrice(product) * quantity)}</strong>
       </div>
-      <button class="remove-btn" type="button" data-remove-cart="${product.id}" aria-label="Remove ${product.name} from cart">
+      <button class="remove-btn" type="button" data-remove-cart="${product.id}" aria-label="Remove ${name} from cart">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
@@ -462,12 +397,12 @@ function renderCart() {
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = cart.reduce((sum, item) => {
     const product = productById(item.id);
-    return product ? sum + product.price * item.quantity : sum;
+    return product ? sum + ssdFinalPrice(product) * item.quantity : sum;
   }, 0);
   selectors.cartEmpty.classList.toggle("visible", cart.length === 0);
   selectors.cartTotal.textContent = formatPrice(totalAmount);
   updateBadge(selectors.cartCount, totalItems);
-  writeStore(storeKeys.cart, cart);
+  ssdSetCart(cart);
 }
 
 function rerenderOpenProductSurfaces() {
@@ -501,62 +436,47 @@ function addToCart(id, button) {
   }, 1200);
 }
 
+let quickViewImages = [];
+let quickViewIndex = 0;
+let quickViewProductName = "";
+
 function openQuickView(id) {
   const product = productById(id);
   if (!product) return;
 
-  const colorsMarkup = product.colors && product.colors.length > 0
-    ? `
-      <div class="product-option-selector">
-        <label for="quickColorSelect">🎨 Select Color</label>
-        <select id="quickColorSelect" class="quick-option-select">
-          ${product.colors.map(color => `<option value="${color}">${color}</option>`).join("")}
-        </select>
-      </div>
-    `
+  quickViewImages = ssdProductImages(product);
+  quickViewIndex = 0;
+  const imageUrl = quickViewImages[0];
+  const name = product.name || "Siri Saree";
+  quickViewProductName = name;
+  const hint = quickViewImages.length > 1
+    ? `<span class="gallery-view-hint"><i class="fa-solid fa-images"></i> View all ${quickViewImages.length} photos</span>`
     : "";
-
-  const sizesMarkup = product.sizes && product.sizes.length > 0
-    ? `
-      <div class="product-option-selector">
-        <label for="quickSizeSelect">📏 Select Size</label>
-        <select id="quickSizeSelect" class="quick-option-select">
-          ${product.sizes.map(size => `<option value="${size}">${size}</option>`).join("")}
-        </select>
-      </div>
-    `
-    : "";
-
-  const imageUrls = productImageUrls(product);
-  const imageUrl = imageUrls[0];
-  const thumbnailsMarkup = imageUrls.length > 1
+  const thumbnailsMarkup = quickViewImages.length > 1
     ? `
       <div class="quick-image-thumbs" aria-label="Product images">
-        ${imageUrls.map((url, index) => `
-          <button class="quick-image-thumb ${index === 0 ? "active" : ""}" type="button" data-quick-image="${url}" aria-label="View image ${index + 1}" aria-pressed="${index === 0 ? "true" : "false"}">
-            <img src="${url}" alt="${product.name} thumbnail ${index + 1}">
+        ${quickViewImages.map((url, index) => `
+          <button class="quick-image-thumb ${index === 0 ? "active" : ""}" type="button" data-quick-index="${index}" aria-label="View image ${index + 1}" aria-pressed="${index === 0 ? "true" : "false"}">
+            <img src="${url}" alt="${name} thumbnail ${index + 1}" onerror="ssdImageError(this)">
           </button>
         `).join("")}
       </div>
     `
     : "";
-  console.log("[product-image]", imageUrl);
   selectors.quickViewContent.innerHTML = `
     <div class="quick-view-layout">
       <div class="quick-view-gallery">
-        <img id="quickViewMainImage" src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+        <div class="quick-view-media">
+          <img id="quickViewMainImage" src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+          ${hint}
+        </div>
         ${thumbnailsMarkup}
       </div>
       <div>
-        <p class="eyebrow">${product.category}</p>
-        <h3>${product.name}</h3>
-        <p class="price">${formatPrice(product.price)}</p>
-        <p class="quick-copy">${product.description}</p>
-        
-        <div class="product-options-container">
-          ${colorsMarkup}
-          ${sizesMarkup}
-        </div>
+        <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
+        <h3>${name}</h3>
+        <p class="price">${ssdPriceMarkup(product)}</p>
+        <p class="quick-copy">${product.description || "Premium saree from Siri Sarees."}</p>
 
         <div class="product-actions" style="margin-top: 20px;">
           <button class="quick-view" type="button" data-wishlist="${product.id}">
@@ -573,14 +493,20 @@ function openQuickView(id) {
   selectors.quickViewModal.classList.add("open");
   selectors.quickViewModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("panel-open");
+
+  ssdOnSwipe(document.querySelector("#quickViewMainImage"), {
+    onSwipeLeft: () => setQuickViewIndex(quickViewIndex + 1),
+    onSwipeRight: () => setQuickViewIndex(quickViewIndex - 1)
+  });
 }
 
-function switchQuickViewImage(button) {
+function setQuickViewIndex(index) {
+  if (quickViewImages.length === 0) return;
+  quickViewIndex = ((index % quickViewImages.length) + quickViewImages.length) % quickViewImages.length;
   const mainImage = document.querySelector("#quickViewMainImage");
-  if (!mainImage) return;
-  mainImage.src = button.dataset.quickImage;
-  document.querySelectorAll(".quick-image-thumb").forEach((thumb) => {
-    const isActive = thumb === button;
+  if (mainImage) mainImage.src = quickViewImages[quickViewIndex];
+  document.querySelectorAll(".quick-image-thumb").forEach((thumb, thumbIndex) => {
+    const isActive = thumbIndex === quickViewIndex;
     thumb.classList.toggle("active", isActive);
     thumb.setAttribute("aria-pressed", String(isActive));
   });
@@ -594,94 +520,39 @@ function closeQuickView() {
 
 
 
-function openWhatsApp(number, message) {
-  const encodedText = encodeURIComponent(message);
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-  let url;
-  if (isMobile) {
-    url = `https://api.whatsapp.com/send?phone=${number}&text=${encodedText}`;
-  } else {
-    url = `https://web.whatsapp.com/send?phone=${number}&text=${encodedText}`;
-  }
-
-  window.open(url, "_blank");
-}
-
 function orderProductWhatsApp(id) {
   const product = productById(id);
   if (!product) return;
 
-  let color = "Standard";
-  let size = "Standard";
-
-  const isQuickViewOpen = selectors.quickViewModal.classList.contains("open");
-
-  if (isQuickViewOpen) {
-    const colorSelect = document.getElementById("quickColorSelect");
-    const sizeSelect = document.getElementById("quickSizeSelect");
-    if (colorSelect) color = colorSelect.value;
-    else if (product.colors && product.colors.length > 0) color = product.colors[0];
-
-    if (sizeSelect) size = sizeSelect.value;
-    else if (product.sizes && product.sizes.length > 0) size = product.sizes[0];
-  } else {
-    if (product.colors && product.colors.length > 0) color = product.colors[0];
-    if (product.sizes && product.sizes.length > 0) size = product.sizes[0];
-  }
-
-  // Include the shareable product URL so WhatsApp orders carry the exact item link.
-  const message = `Hi Siri Sarees!
-
-I would like to order the following product:
-
-Product Name: ${product.name}
-Price: ${formatPrice(product.price)}
-Product URL: ${getProductUrl(product.id)}
-Color: ${color}
-Size: ${size}
-
-Please confirm availability and share the payment details.
-
-Thank you!`;
-
-  // Get WhatsApp number from configuration
-  const whatsappNumber = window.SSD_CONFIG ? window.SSD_CONFIG.WHATSAPP_NUMBER : "918019655336";
-
-
-
-  // Redirect to WhatsApp
-  openWhatsApp(whatsappNumber, message);
+  ssdOpenWhatsApp(ssdOrderMessage(product));
 }
 
 function checkout() {
   if (cart.length === 0) return;
 
-  const total = cart.reduce((sum, item) => {
-    const product = productById(item.id);
-    return product ? sum + product.price * item.quantity : sum;
-  }, 0);
-
-  // Format Cart WhatsApp message
   const cartItems = cart.map(item => ({ ...item, product: productById(item.id) })).filter(item => item.product);
+  const total = cartItems.reduce((sum, item) => sum + ssdFinalPrice(item.product) * item.quantity, 0);
+
   let message = `Hi Siri Sarees!\n\nI would like to order the following products from my cart:\n\n`;
   cartItems.forEach(item => {
-    message += `🛍 Product: ${item.product.name}\n🆔 Product ID: ${item.id}\n💰 Price: ₹${item.product.price} (Qty: ${item.quantity})\n\n`;
+    message += `🛍 Product: ${item.product.name}\n🆔 Product ID: ${item.id}\n💰 Price: ${formatPrice(ssdFinalPrice(item.product))} (Qty: ${item.quantity})\n\n`;
   });
-  message += `💰 Total Amount: ₹${total}\n\nPlease confirm availability and share the payment details.\n\nThank you!`;
+  message += `💰 Total Amount: ${formatPrice(total)}\n\nPlease confirm availability and share the payment details.\n\nThank you!`;
 
   cart = [];
   renderCart();
-
-  // Redirect to WhatsApp
-  const whatsappNumber = window.SSD_CONFIG ? window.SSD_CONFIG.WHATSAPP_NUMBER : "918019655336";
-  openWhatsApp(whatsappNumber, message);
+  ssdOpenWhatsApp(message);
 }
 
 function handleProductClick(event) {
-  const imageButton = event.target.closest("[data-quick-image]");
+  const imageButton = event.target.closest("[data-quick-index]");
   if (imageButton) {
-    switchQuickViewImage(imageButton);
+    setQuickViewIndex(Number(imageButton.dataset.quickIndex));
+    return;
+  }
+
+  if (event.target.closest("#quickViewMainImage")) {
+    ssdOpenLightbox(quickViewImages, quickViewProductName, quickViewIndex, setQuickViewIndex);
     return;
   }
 

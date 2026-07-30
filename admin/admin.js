@@ -1,7 +1,14 @@
 const API_BASE = 'http://127.0.0.1:5000/api';
+const FALLBACK_IMAGE = 'https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700';
 
 function getApiUrl(path) {
   return `${API_BASE}${path}`;
+}
+
+function handleImageError(imgEl) {
+  if (!imgEl || imgEl.dataset.fallbackApplied) return;
+  imgEl.dataset.fallbackApplied = 'true';
+  imgEl.src = FALLBACK_IMAGE;
 }
 
 function showMessage(target, message, kind = 'error') {
@@ -41,23 +48,101 @@ function getQueryParam(name) {
   return params.get(name);
 }
 
+const MAX_PRODUCT_IMAGES = 4;
+
 function productImageUrls(product) {
   const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url];
-  // The backend now stores one public image URL directly on products.image_url.
-  return images.filter(Boolean).slice(0, 1);
+  // Products can have up to MAX_PRODUCT_IMAGES images; the backend stores them as a
+  // comma-separated image_url and exposes them back as the `images` array (see routes.py).
+  return images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
 }
 
-function hasTooManyImages(form, messageTarget) {
-  const imageInput = form.querySelector('input[type="file"][name="image"]');
-  if (imageInput) {
-    const isMultiple = imageInput.hasAttribute('multiple');
-    const limit = isMultiple ? 3 : 1;
-    if (imageInput.files.length > limit) {
-      showMessage(messageTarget, `A product can have at most ${limit} image${limit > 1 ? 's' : ''}`, 'error');
-      return true;
-    }
+// Drives a fixed grid of MAX_PRODUCT_IMAGES boxes (used by both Add Product and
+// Edit Product). Slot 0 is always the main image shown to customers. Each box is
+// independently empty/existing/new, so there's no way to exceed the limit and no
+// separate "too many images" check is needed - the grid itself enforces it.
+function setupImageSlots({ grid, fileInput, hint, initialImages = [] }) {
+  const slots = Array.from({ length: MAX_PRODUCT_IMAGES }, (_, index) => {
+    const url = initialImages[index];
+    return url ? { type: 'existing', url } : null;
+  });
+  let pendingIndex = null;
+
+  function render() {
+    grid.innerHTML = slots.map((slot, index) => {
+      if (!slot) {
+        return `
+          <button type="button" class="image-slot empty" data-slot="${index}">
+            <span class="plus-icon">+</span>
+            <span>${index === 0 ? 'Main Image' : 'Add Image'}</span>
+          </button>
+        `;
+      }
+      const src = slot.type === 'existing' ? slot.url : slot.previewUrl;
+      return `
+        <div class="image-slot filled" data-slot="${index}">
+          <img src="${src}" alt="Product image ${index + 1}" onerror="handleImageError(this)" />
+          ${index === 0 ? '<span class="image-slot-badge">Main</span>' : ''}
+          <button type="button" class="image-slot-remove" data-remove-slot="${index}" aria-label="Remove this image" title="Remove this image">&times;</button>
+        </div>
+      `;
+    }).join('');
+    if (hint) hint.textContent = `${slots.filter(Boolean).length} / ${MAX_PRODUCT_IMAGES} images used`;
   }
-  return false;
+
+  grid.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-remove-slot]');
+    if (removeButton) {
+      const index = Number(removeButton.dataset.removeSlot);
+      if (slots[index]?.type === 'new') URL.revokeObjectURL(slots[index].previewUrl);
+      slots[index] = null;
+      render();
+      return;
+    }
+    const emptySlot = event.target.closest('.image-slot.empty');
+    if (emptySlot) {
+      pendingIndex = Number(emptySlot.dataset.slot);
+      fileInput.value = '';
+      fileInput.click();
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file || pendingIndex === null) return;
+    if (slots[pendingIndex]?.type === 'new') URL.revokeObjectURL(slots[pendingIndex].previewUrl);
+    slots[pendingIndex] = { type: 'new', file, previewUrl: URL.createObjectURL(file) };
+    pendingIndex = null;
+    render();
+  });
+
+  render();
+
+  return {
+    // Builds exactly what the backend expects: new files (in slot order) to attach
+    // under the repeated `image` field, the kept existing URLs (in slot order) for
+    // `keep_images`, and an `image_order` token per slot so the server can zip the
+    // two back together in the right positions (see routes.py update_product).
+    appendTo(formData) {
+      const order = [];
+      const keepUrls = [];
+      slots.forEach((slot) => {
+        if (!slot) { order.push('empty'); return; }
+        if (slot.type === 'existing') { order.push('keep'); keepUrls.push(slot.url); return; }
+        order.push('new');
+        formData.append('image', slot.file);
+      });
+      formData.append('keep_images', keepUrls.join(','));
+      formData.append('image_order', order.join(','));
+    },
+    setImages(urls) {
+      slots.forEach((slot, index) => {
+        if (slot?.type === 'new') URL.revokeObjectURL(slot.previewUrl);
+        slots[index] = urls[index] ? { type: 'existing', url: urls[index] } : null;
+      });
+      render();
+    }
+  };
 }
 
 function redirectIfUnauthenticated() {
@@ -85,7 +170,18 @@ async function checkAuth() {
 document.addEventListener('DOMContentLoaded', async () => {
   const links = document.querySelectorAll('.sidebar-nav a');
   links.forEach((link) => {
-    link.addEventListener('click', () => {
+    link.addEventListener('click', async (event) => {
+      if (link.getAttribute('href') === 'login.html') {
+        event.preventDefault();
+        try {
+          await fetch(getApiUrl('/auth/logout'), { method: 'POST', credentials: 'include' });
+        } catch {
+          // Ignore network errors; redirect to login regardless.
+        } finally {
+          window.location.href = 'login.html';
+        }
+        return;
+      }
       links.forEach((item) => item.classList.remove('active'));
       link.classList.add('active');
     });
@@ -162,7 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const products = result.products || [];
       tbody.innerHTML = products.map((product) => `
         <tr>
-          <td>${productImageUrls(product)[0] ? `<img src="${productImageUrls(product)[0]}" alt="${product.name}" class="table-image" />` : '<div class="product-thumb small">P</div>'}</td>
+          <td>${productImageUrls(product)[0] ? `<img src="${productImageUrls(product)[0]}" alt="${product.name}" class="table-image" onerror="handleImageError(this)" />` : '<div class="product-thumb small">P</div>'}</td>
           <td>${product.name}</td>
           <td>${product.category}</td>
           <td>₹${Number(product.price).toLocaleString('en-IN')}</td>
@@ -208,26 +304,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const submitButton = addProductForm.querySelector('button');
     submitButton.dataset.originalText = submitButton.textContent;
 
-    const imageInput = addProductForm.querySelector('input[type="file"][name="image"]');
-    if (imageInput) {
-      imageInput.addEventListener('change', () => {
-        const display = addProductForm.querySelector('.selected-files');
-        if (display) {
-          if (imageInput.files.length > 0) {
-            const names = Array.from(imageInput.files).map((f) => f.name).join(', ');
-            display.textContent = `Selected: ${names}`;
-          } else {
-            display.textContent = '';
-          }
-        }
-      });
-    }
+    const imageSlots = setupImageSlots({
+      grid: addProductForm.querySelector('#imageSlotGrid'),
+      fileInput: document.querySelector('#slotFileInput'),
+      hint: document.querySelector('#imageSlotHint')
+    });
 
     addProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(addProductForm);
+      imageSlots.appendTo(formData);
       const messageTarget = document.querySelector('.form-status');
-      if (hasTooManyImages(addProductForm, messageTarget)) return;
       setLoading(submitButton, true);
       try {
         const response = await fetch(getApiUrl('/products'), {
@@ -239,8 +326,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!response.ok) throw new Error(result.error || 'Unable to save product');
         showMessage(messageTarget, result.message || 'Product saved!', 'success');
         addProductForm.reset();
-        const display = addProductForm.querySelector('.selected-files');
-        if (display) display.textContent = '';
+        imageSlots.setImages([]);
       } catch (error) {
         showMessage(messageTarget, error.message || 'Unable to save product', 'error');
       } finally {
@@ -256,6 +342,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const productId = getQueryParam('id');
     const submitButton = editProductForm.querySelector('button');
     submitButton.dataset.originalText = submitButton.textContent;
+
+    const imageSlots = setupImageSlots({
+      grid: editProductForm.querySelector('#imageSlotGrid'),
+      fileInput: document.querySelector('#slotFileInput'),
+      hint: document.querySelector('#imageSlotHint')
+    });
+
     if (productId) {
       try {
         const response = await fetch(getApiUrl(`/products/${productId}`), { credentials: 'include' });
@@ -270,21 +363,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         const descriptionField = editProductForm.querySelector('textarea');
         if (descriptionField) descriptionField.value = product.description || '';
-        const existingImages = document.querySelector('#existingImages');
-        if (existingImages) {
-          const images = productImageUrls(product);
-          existingImages.innerHTML = images.map((imageUrl, index) => `<img src="${imageUrl}" alt="${product.name} image ${index + 1}" />`).join('');
-        }
+        imageSlots.setImages(productImageUrls(product));
       } catch (error) {
         showMessage(document.querySelector('.form-status'), error.message, 'error');
       }
     }
+
     editProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const productId = getQueryParam('id');
-      const formData = new FormData(editProductForm);
       const messageTarget = document.querySelector('.form-status');
-      if (hasTooManyImages(editProductForm, messageTarget)) return;
+      const formData = new FormData(editProductForm);
+      imageSlots.appendTo(formData);
       setLoading(submitButton, true);
       try {
         const response = await fetch(getApiUrl(`/products/${productId}`), {
@@ -295,6 +385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Unable to update product');
         showMessage(messageTarget, result.message || 'Product updated!', 'success');
+        imageSlots.setImages(productImageUrls(result.product || {}));
       } catch (error) {
         showMessage(messageTarget, error.message || 'Unable to update product', 'error');
       } finally {

@@ -95,6 +95,7 @@ def create_app() -> Flask:
 
     @app.get("/style.css")
     @app.get("/config.js")
+    @app.get("/common.js")
     @app.get("/index.html")
     @app.get("/product.js")
     @app.get("/script.js")

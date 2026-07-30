@@ -1,51 +1,158 @@
-const API_BASE = (window.SSD_CONFIG?.API_BASE || "http://127.0.0.1:5000/api").replace(/\/$/, "");
+const selectors = {
+  header: document.querySelector("#siteHeader"),
+  backTop: document.querySelector(".back-top"),
+  breadcrumb: document.querySelector("#productBreadcrumb"),
+  productPage: document.querySelector("#productPage"),
+  cartCount: document.querySelector(".cart-count"),
+  wishlistCount: document.querySelector(".wishlist-count"),
+  panelOverlay: document.querySelector("#panelOverlay"),
+  panels: document.querySelectorAll(".side-panel"),
+  wishlistItems: document.querySelector("#wishlistItems"),
+  wishlistEmpty: document.querySelector("#wishlistEmpty"),
+  cartItems: document.querySelector("#cartItems"),
+  cartEmpty: document.querySelector("#cartEmpty"),
+  cartTotal: document.querySelector("#cartTotal"),
+  floatWhatsApp: document.querySelector("#floatWhatsApp")
+};
 
-function resolveProductImageUrl(imageUrl) {
-  const fallbackImage = "https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700";
-  const normalizedUrl = (imageUrl || "").toString().trim();
-  const apiOrigin = "http://127.0.0.1:5000";
-  const supabaseUrl = (window.SSD_CONFIG?.SUPABASE_URL || "").replace(/\/$/, "");
-  const supabaseBucket = window.SSD_CONFIG?.SUPABASE_BUCKET || "saree_images";
+let wishlist = ssdGetWishlist();
+let cart = ssdGetCart();
+let currentProduct = null;
+let similarProducts = [];
 
-  if (!normalizedUrl) return fallbackImage;
-  if (/^https?:\/\//i.test(normalizedUrl)) return normalizedUrl;
-  if (supabaseUrl && !normalizedUrl.startsWith("/") && !normalizedUrl.startsWith("storage/")) {
-    return `${supabaseUrl}/storage/v1/object/public/${supabaseBucket}/${normalizedUrl}`;
+function productById(id) {
+  return ssdProductCache.get(String(id)) || null;
+}
+
+function updateHeaderState() {
+  selectors.header.classList.toggle("scrolled", window.scrollY > 18);
+  selectors.backTop.classList.toggle("visible", window.scrollY > 520);
+}
+
+function updateBadge(badge, value) {
+  badge.textContent = value;
+  badge.classList.toggle("visible", value > 0);
+}
+
+function openPanel(panelId) {
+  selectors.panels.forEach((panel) => {
+    const isActive = panel.id === panelId;
+    panel.classList.toggle("open", isActive);
+    panel.setAttribute("aria-hidden", String(!isActive));
+  });
+  selectors.panelOverlay.classList.add("visible");
+  selectors.panelOverlay.setAttribute("aria-hidden", "false");
+  document.body.classList.add("panel-open");
+}
+
+function closePanels() {
+  selectors.panels.forEach((panel) => {
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+  });
+  selectors.panelOverlay.classList.remove("visible");
+  selectors.panelOverlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("panel-open");
+}
+
+async function renderWishlist() {
+  await ssdEnsureProducts(wishlist, [currentProduct, ...similarProducts].filter(Boolean));
+  const wishlistProducts = wishlist.map(productById).filter(Boolean);
+
+  selectors.wishlistItems.innerHTML = wishlistProducts.map((product) => {
+    const imageUrl = ssdProductImages(product)[0];
+    const name = product.name || "Siri Saree";
+    return `
+    <div class="panel-item">
+      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+      <div>
+        <h3>${name}</h3>
+        <p>${product.category || "Siri Saree Divine"}</p>
+        <strong>${ssdFormatPrice(ssdFinalPrice(product))}</strong>
+      </div>
+      <button class="remove-btn" type="button" data-remove-wishlist="${product.id}" aria-label="Remove ${name} from wishlist">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  `;
+  }).join("");
+
+  selectors.wishlistEmpty.classList.toggle("visible", wishlist.length === 0);
+  updateBadge(selectors.wishlistCount, wishlist.length);
+  ssdSetWishlist(wishlist);
+}
+
+async function renderCart() {
+  await ssdEnsureProducts(cart.map((item) => item.id), [currentProduct, ...similarProducts].filter(Boolean));
+  const cartEntries = cart.map((item) => ({ ...item, product: productById(item.id) })).filter((item) => item.product);
+
+  selectors.cartItems.innerHTML = cartEntries.map(({ product, quantity }) => {
+    const imageUrl = ssdProductImages(product)[0];
+    const name = product.name || "Siri Saree";
+    return `
+    <div class="panel-item cart-item">
+      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+      <div>
+        <h3>${name}</h3>
+        <p>Quantity: ${quantity}</p>
+        <strong>${ssdFormatPrice(ssdFinalPrice(product) * quantity)}</strong>
+      </div>
+      <button class="remove-btn" type="button" data-remove-cart="${product.id}" aria-label="Remove ${name} from cart">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  `;
+  }).join("");
+
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = cartEntries.reduce((sum, { product, quantity }) => sum + ssdFinalPrice(product) * quantity, 0);
+  selectors.cartEmpty.classList.toggle("visible", cart.length === 0);
+  selectors.cartTotal.textContent = ssdFormatPrice(totalAmount);
+  updateBadge(selectors.cartCount, totalItems);
+  ssdSetCart(cart);
+}
+
+function toggleWishlist(id) {
+  wishlist = wishlist.includes(id) ? wishlist.filter((itemId) => itemId !== id) : [...wishlist, id];
+  renderWishlist();
+  syncWishlistButtons();
+}
+
+function addToCart(id, quantity = 1) {
+  const existingItem = cart.find((item) => item.id === id);
+  if (existingItem) {
+    existingItem.quantity += quantity;
+  } else {
+    cart.push({ id, quantity });
   }
-  if (normalizedUrl.startsWith("/")) return `${apiOrigin}${normalizedUrl}`;
-  return `${apiOrigin}/${normalizedUrl}`;
+  renderCart();
 }
 
-function productImageUrls(product) {
-  const urls = Array.isArray(product.images) && product.images.length > 0
-    ? product.images
-    : [product.image || product.image_url];
-  return urls.map(resolveProductImageUrl).filter(Boolean).slice(0, 4);
+function syncWishlistButtons() {
+  document.querySelectorAll("[data-toggle-wishlist]").forEach((button) => {
+    const id = button.dataset.toggleWishlist;
+    const active = wishlist.includes(id);
+    button.classList.toggle("active", active);
+    button.innerHTML = active
+      ? '<i class="fa-solid fa-heart"></i> Saved to Wishlist'
+      : '<i class="fa-regular fa-heart"></i> Add to Wishlist';
+  });
 }
 
-function formatPrice(value) {
-  return `Rs. ${Number(value || 0).toLocaleString("en-IN")}`;
-}
+function checkout() {
+  if (cart.length === 0) return;
+  const cartEntries = cart.map((item) => ({ ...item, product: productById(item.id) })).filter((item) => item.product);
+  const total = cartEntries.reduce((sum, { product, quantity }) => sum + ssdFinalPrice(product) * quantity, 0);
 
-function getPublicSiteBaseUrl() {
-  const configuredUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "").trim();
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+  let message = `Hi Siri Sarees!\n\nI would like to order the following products from my cart:\n\n`;
+  cartEntries.forEach(({ product, quantity }) => {
+    message += `🛍 Product: ${product.name}\n💰 Price: ${ssdFormatPrice(ssdFinalPrice(product))} (Qty: ${quantity})\n🔗 ${ssdProductUrl(product.id)}\n\n`;
+  });
+  message += `💰 Total Amount: ${ssdFormatPrice(total)}\n\nPlease confirm availability and share the payment details.\n\nThank you!`;
 
-  if (window.location.origin && window.location.origin !== "null") {
-    return window.location.origin.replace(/\/$/, "");
-  }
-
-  return "http://127.0.0.1:5000";
-}
-
-function getProductUrl(productId) {
-  const url = new URL("product.html", `${getPublicSiteBaseUrl()}/`);
-  if (productId) url.searchParams.set("id", productId);
-  return url.href;
-}
-
-function productPageUrl() {
-  return getProductUrl(new URLSearchParams(window.location.search).get("id"));
+  cart = [];
+  renderCart();
+  ssdOpenWhatsApp(message);
 }
 
 function setMeta(selector, value) {
@@ -54,64 +161,41 @@ function setMeta(selector, value) {
 }
 
 function updateProductMeta(product, imageUrl) {
-  const title = `${product.name} | Siri Saree Divine`;
-  const description = product.description || `${product.name} for ${formatPrice(product.price)}.`;
+  const name = product.name || "Siri Saree Divine Product";
+  const title = `${name} | Siri Saree Divine`;
+  const description = product.description || `${name} for ${ssdFormatPrice(product.price)}.`;
   document.title = title;
   setMeta('meta[name="description"]', description);
   setMeta('meta[property="og:title"]', title);
   setMeta('meta[property="og:description"]', description);
   setMeta('meta[property="og:image"]', imageUrl);
-  setMeta('meta[property="og:url"]', productPageUrl());
+  setMeta('meta[property="og:url"]', ssdProductUrl(product.id));
 }
 
-function openWhatsApp(number, message) {
-  const encodedText = encodeURIComponent(message);
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  const url = isMobile
-    ? `https://api.whatsapp.com/send?phone=${number}&text=${encodedText}`
-    : `https://web.whatsapp.com/send?phone=${number}&text=${encodedText}`;
-  window.open(url, "_blank");
-}
-
-function buyProduct(product) {
-  const message = `Hi Siri Sarees!
-
-I would like to order the following product:
-
-Product Name: ${product.name}
-Price: ${formatPrice(product.price)}
-Product URL: ${productPageUrl()}
-
-Please confirm availability and share the payment details.
-
-Thank you!`;
-
-  const whatsappNumber = window.SSD_CONFIG ? window.SSD_CONFIG.WHATSAPP_NUMBER : "918019655336";
-  openWhatsApp(whatsappNumber, message);
-}
-
-async function loadProduct(productId) {
-  const response = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}`);
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Unable to load product");
-  return result.product;
-}
-
-async function loadSimilarProducts(productId) {
-  const response = await fetch(`${API_BASE}/products/${encodeURIComponent(productId)}/similar`);
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Unable to load similar products");
-  return result.products || [];
+function renderBreadcrumb(product) {
+  const category = product.category || "Sarees";
+  selectors.breadcrumb.innerHTML = `
+    <a href="index.html#home">Home</a>
+    <span class="crumb-sep" aria-hidden="true">/</span>
+    <a href="index.html#trending">${category}</a>
+    <span class="crumb-sep" aria-hidden="true">/</span>
+    <span aria-current="page">${product.name || "Saree"}</span>
+  `;
 }
 
 function similarProductCard(product) {
-  const imageUrl = productImageUrls(product)[0];
+  const imageUrl = ssdProductImages(product)[0];
+  const name = product.name || "Siri Saree";
+  const { discountPercent } = ssdPriceBreakdown(product);
+  const offerBadge = discountPercent > 0 ? `<span class="offer-badge">${discountPercent}% OFF</span>` : "";
   return `
-    <article class="product-card reveal visible" data-similar-product="${product.id}" tabindex="0" aria-label="View ${product.name}">
-      <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+    <article class="product-card reveal visible" data-similar-product="${product.id}" tabindex="0" aria-label="View ${name}">
+      ${offerBadge}
+      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
       <div class="product-info">
-        <h3>${product.name}</h3>
-        <p class="price">${formatPrice(product.price)}</p>
+        <p class="product-category">${product.category || "Siri Saree Divine"}</p>
+        <h3>${name}</h3>
+        <p class="price">${ssdPriceMarkup(product)}</p>
       </div>
     </article>
   `;
@@ -126,24 +210,76 @@ function renderSimilarProducts(products) {
   section.hidden = false;
 }
 
-function renderProduct(product) {
-  const section = document.querySelector("#productPage");
-  const imageUrl = productImageUrls(product)[0];
-  updateProductMeta(product, imageUrl);
+function galleryMarkup(images, name) {
+  const hint = images.length > 1
+    ? `<span class="gallery-view-hint"><i class="fa-solid fa-images"></i> View all ${images.length} photos</span>`
+    : "";
+  const mainImageBlock = `
+    <div class="product-gallery-media">
+      <img class="product-gallery-main" id="productMainImage" src="${images[0]}" alt="${name}" onerror="ssdImageError(this)">
+      ${hint}
+    </div>
+  `;
 
-  section.innerHTML = `
+  if (images.length <= 1) {
+    return mainImageBlock;
+  }
+
+  const thumbs = images.map((url, index) => `
+    <button class="product-gallery-thumb ${index === 0 ? "active" : ""}" type="button" data-gallery-index="${index}" aria-label="View image ${index + 1}" aria-pressed="${index === 0 ? "true" : "false"}">
+      <img src="${url}" alt="${name} thumbnail ${index + 1}" onerror="ssdImageError(this)">
+    </button>
+  `).join("");
+
+  return `
+    ${mainImageBlock}
+    <div class="product-gallery-thumbs">${thumbs}</div>
+  `;
+}
+
+function renderProduct(product) {
+  currentProduct = product;
+  ssdProductCache.set(String(product.id), product);
+
+  const images = ssdProductImages(product);
+  const name = product.name || "Siri Saree";
+  const description = product.description?.trim() || "A handpicked premium saree from Siri Saree Divine's curated collection.";
+  const isWished = wishlist.includes(product.id);
+
+  updateProductMeta(product, images[0]);
+  renderBreadcrumb(product);
+
+  selectors.productPage.innerHTML = `
     <div class="product-page-layout">
-      <div class="quick-view-gallery">
-        <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+      <div class="product-gallery">
+        ${galleryMarkup(images, name)}
       </div>
       <div class="product-page-copy">
         <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
-        <h1>${product.name}</h1>
-        <p class="price">${formatPrice(product.price)}</p>
-        <p class="quick-copy">${product.description || "Premium saree from Siri Sarees."}</p>
-        <button class="order-now-btn" type="button" id="buyProduct">
-          <i class="fa-brands fa-whatsapp"></i> Buy on WhatsApp
-        </button>
+        <h1>${name}</h1>
+        <p class="price">${ssdPriceMarkup(product)}</p>
+        <p class="quick-copy">${description}</p>
+
+        <div class="product-quantity-row">
+          <label for="productQuantity">Quantity</label>
+          <div class="quantity-stepper">
+            <button type="button" id="qtyDecrease" aria-label="Decrease quantity">&minus;</button>
+            <input type="text" id="productQuantity" value="1" inputmode="numeric" aria-label="Quantity" readonly>
+            <button type="button" id="qtyIncrease" aria-label="Increase quantity">&plus;</button>
+          </div>
+        </div>
+
+        <div class="product-actions">
+          <button class="quick-view" type="button" data-toggle-wishlist="${product.id}">
+            <i class="fa-${isWished ? "solid" : "regular"} fa-heart"></i> ${isWished ? "Saved to Wishlist" : "Add to Wishlist"}
+          </button>
+          <button class="add-cart" type="button" id="addToCartBtn">Add to Cart</button>
+          <button class="order-now-btn" type="button" id="buyProduct">
+            <i class="fa-brands fa-whatsapp"></i> Buy on WhatsApp
+          </button>
+        </div>
+
+        <p class="whatsapp-note"><i class="fa-brands fa-whatsapp"></i> Order directly on WhatsApp &mdash; no account needed</p>
       </div>
     </div>
     <div class="similar-products-section" id="similarProductsSection" hidden>
@@ -154,42 +290,165 @@ function renderProduct(product) {
     </div>
   `;
 
-  document.querySelector("#buyProduct").addEventListener("click", () => buyProduct(product));
+  wireProductInteractions(product);
+  syncWishlistButtons();
+
+  if (selectors.floatWhatsApp) {
+    const message = `Hi Siri Sarees! I have a question about ${name}.`;
+    selectors.floatWhatsApp.href = `https://wa.me/${ssdWhatsAppNumber()}?text=${encodeURIComponent(message)}`;
+    selectors.floatWhatsApp.hidden = false;
+  }
+}
+
+function currentQuantity() {
+  const input = document.querySelector("#productQuantity");
+  return Math.max(1, Number(input?.value) || 1);
+}
+
+function wireProductInteractions(product) {
+  const qtyInput = document.querySelector("#productQuantity");
+  document.querySelector("#qtyDecrease")?.addEventListener("click", () => {
+    qtyInput.value = Math.max(1, currentQuantity() - 1);
+  });
+  document.querySelector("#qtyIncrease")?.addEventListener("click", () => {
+    qtyInput.value = Math.min(20, currentQuantity() + 1);
+  });
+
+  document.querySelector(`[data-toggle-wishlist="${product.id}"]`)?.addEventListener("click", () => {
+    toggleWishlist(product.id);
+  });
+
+  document.querySelector("#addToCartBtn")?.addEventListener("click", (event) => {
+    addToCart(product.id, currentQuantity());
+    const button = event.currentTarget;
+    button.textContent = "Added to Cart";
+    button.classList.add("added");
+    setTimeout(() => {
+      button.textContent = "Add to Cart";
+      button.classList.remove("added");
+    }, 1200);
+  });
+
+  document.querySelector("#buyProduct")?.addEventListener("click", () => {
+    ssdOpenWhatsApp(ssdOrderMessage(product, { quantity: currentQuantity() }));
+  });
+
+  const gallery = document.querySelector(".product-gallery");
+  const galleryImages = ssdProductImages(product);
+  let activeGalleryIndex = 0;
+
+  function setActiveGalleryIndex(index) {
+    activeGalleryIndex = ((index % galleryImages.length) + galleryImages.length) % galleryImages.length;
+    const mainImage = document.querySelector("#productMainImage");
+    if (mainImage) mainImage.src = galleryImages[activeGalleryIndex];
+    gallery?.querySelectorAll(".product-gallery-thumb").forEach((thumb, thumbIndex) => {
+      const isActive = thumbIndex === activeGalleryIndex;
+      thumb.classList.toggle("active", isActive);
+      thumb.setAttribute("aria-pressed", String(isActive));
+    });
+  }
+
+  gallery?.addEventListener("click", (event) => {
+    const thumbButton = event.target.closest("[data-gallery-index]");
+    if (thumbButton) {
+      setActiveGalleryIndex(Number(thumbButton.dataset.galleryIndex));
+      return;
+    }
+    if (event.target.closest("#productMainImage")) {
+      ssdOpenLightbox(galleryImages, product.name || "Siri Saree", activeGalleryIndex, setActiveGalleryIndex);
+    }
+  });
+
+  ssdOnSwipe(document.querySelector("#productMainImage"), {
+    onSwipeLeft: () => setActiveGalleryIndex(activeGalleryIndex + 1),
+    onSwipeRight: () => setActiveGalleryIndex(activeGalleryIndex - 1)
+  });
+}
+
+function renderNotFound(message) {
+  selectors.productPage.innerHTML = `
+    <div class="product-not-found">
+      <p class="empty-state visible">${message}</p>
+      <a class="btn btn-primary" href="index.html#trending">Back to Shopping</a>
+    </div>
+  `;
 }
 
 async function initializeProductPage() {
   const productId = new URLSearchParams(window.location.search).get("id");
-  const section = document.querySelector("#productPage");
 
   if (!productId) {
-    section.innerHTML = '<p class="empty-state visible">Product not found</p>';
+    renderNotFound("Product not found");
     return;
   }
 
   try {
-    const product = await loadProduct(productId);
+    const product = await ssdFetchProduct(productId);
     renderProduct(product);
+    renderWishlist();
+    renderCart();
     try {
-      renderSimilarProducts(await loadSimilarProducts(productId));
+      similarProducts = await ssdFetchSimilarProducts(productId);
+      renderSimilarProducts(similarProducts);
     } catch (error) {
       console.warn(error.message);
     }
   } catch (error) {
-    section.innerHTML = `<p class="empty-state visible">${error.message}</p>`;
+    renderNotFound(error.message || "Unable to load this product");
   }
 }
 
 document.addEventListener("click", (event) => {
   const card = event.target.closest("[data-similar-product]");
-  if (card) window.location.href = getProductUrl(card.dataset.similarProduct);
+  if (card) window.location.href = ssdProductUrl(card.dataset.similarProduct);
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closePanels();
   if (event.key !== "Enter" && event.key !== " ") return;
   const card = event.target.closest("[data-similar-product]");
   if (!card) return;
   event.preventDefault();
-  window.location.href = getProductUrl(card.dataset.similarProduct);
+  window.location.href = ssdProductUrl(card.dataset.similarProduct);
 });
 
+document.querySelector("#openWishlist")?.addEventListener("click", () => {
+  renderWishlist();
+  openPanel("wishlistPanel");
+});
+document.querySelector("#openCart")?.addEventListener("click", () => {
+  renderCart();
+  openPanel("cartPanel");
+});
+document.querySelectorAll("[data-close-panel]").forEach((button) => {
+  button.addEventListener("click", closePanels);
+});
+selectors.panelOverlay?.addEventListener("click", closePanels);
+
+selectors.wishlistItems?.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-remove-wishlist]");
+  if (!removeButton) return;
+  wishlist = wishlist.filter((id) => id !== removeButton.dataset.removeWishlist);
+  renderWishlist();
+  syncWishlistButtons();
+});
+
+selectors.cartItems?.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-remove-cart]");
+  if (!removeButton) return;
+  cart = cart.filter((item) => item.id !== removeButton.dataset.removeCart);
+  renderCart();
+});
+
+document.querySelector("#checkoutBtn")?.addEventListener("click", checkout);
+
+selectors.backTop?.addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+window.addEventListener("scroll", updateHeaderState);
+
+updateBadge(selectors.wishlistCount, wishlist.length);
+updateBadge(selectors.cartCount, cart.reduce((sum, item) => sum + item.quantity, 0));
+updateHeaderState();
 initializeProductPage();
