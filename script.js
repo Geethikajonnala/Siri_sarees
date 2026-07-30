@@ -267,6 +267,13 @@ function formatPrice(value) {
   return `Rs. ${value.toLocaleString("en-IN")}`;
 }
 
+function getProductUrl(id) {
+  const productBaseUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "http://127.0.0.1:5000").replace(/\/$/, "");
+  const productUrl = new URL("product.html", `${productBaseUrl}/`);
+  productUrl.searchParams.set("id", id);
+  return productUrl.href;
+}
+
 function productById(id) {
   return products.find((product) => product.id === id);
 }
@@ -303,7 +310,7 @@ function productCard(product) {
   const imageUrl = productImageUrls(product)[0];
   console.log("[product-image]", imageUrl);
   return `
-    <article class="product-card reveal visible" data-id="${product.id}">
+    <article class="product-card reveal visible" data-id="${product.id}" tabindex="0" aria-label="View ${product.name}">
       <button class="wishlist-btn ${wished ? "active" : ""}" type="button" data-wishlist="${product.id}" aria-label="${wished ? "Remove" : "Add"} ${product.name} ${wished ? "from" : "to"} wishlist">
         <i class="${wished ? "fa-solid" : "fa-regular"} fa-heart"></i>
       </button>
@@ -612,16 +619,16 @@ function orderProductWhatsApp(id) {
     if (product.sizes && product.sizes.length > 0) size = product.sizes[0];
   }
 
-  // Generate template message
+  // Include the shareable product URL so WhatsApp orders carry the exact item link.
   const message = `Hi Siri Sarees!
 
 I would like to order the following product:
 
-🛍 Product Name: ${product.name}
-🆔 Product ID: ${product.id}
-💰 Price: ₹${product.price}
-🎨 Color: ${color}
-📏 Size: ${size}
+Product Name: ${product.name}
+Price: ${formatPrice(product.price)}
+Product URL: ${getProductUrl(product.id)}
+Color: ${color}
+Size: ${size}
 
 Please confirm availability and share the payment details.
 
@@ -671,11 +678,36 @@ function handleProductClick(event) {
   const cartButton = event.target.closest("[data-cart]");
   const quickButton = event.target.closest("[data-quick-view]");
   const orderButton = event.target.closest("[data-order-now]");
+  const productCard = event.target.closest(".product-card[data-id]");
 
-  if (wishlistButton) toggleWishlist(wishlistButton.dataset.wishlist);
-  if (cartButton) addToCart(cartButton.dataset.cart, cartButton);
-  if (quickButton) openQuickView(quickButton.dataset.quickView);
-  if (orderButton) orderProductWhatsApp(orderButton.dataset.orderNow);
+  if (wishlistButton) {
+    toggleWishlist(wishlistButton.dataset.wishlist);
+    return;
+  }
+  if (cartButton) {
+    addToCart(cartButton.dataset.cart, cartButton);
+    return;
+  }
+  if (quickButton) {
+    openQuickView(quickButton.dataset.quickView);
+    return;
+  }
+  if (orderButton) {
+    orderProductWhatsApp(orderButton.dataset.orderNow);
+    return;
+  }
+  if (productCard) {
+    window.location.href = getProductUrl(productCard.dataset.id);
+  }
+}
+
+function handleProductKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  if (event.target.closest("button")) return;
+  const productCard = event.target.closest(".product-card[data-id]");
+  if (!productCard) return;
+  event.preventDefault();
+  window.location.href = getProductUrl(productCard.dataset.id);
 }
 
 selectors.menuToggle.addEventListener("click", () => {
@@ -696,6 +728,7 @@ selectors.mainNav.querySelectorAll("a").forEach((link) => {
 
 [selectors.productGrid, selectors.moreGrid, selectors.quickViewContent].forEach((container) => {
   container.addEventListener("click", handleProductClick);
+  container.addEventListener("keydown", handleProductKeydown);
 });
 
 selectors.wishlistItems.addEventListener("click", (event) => {

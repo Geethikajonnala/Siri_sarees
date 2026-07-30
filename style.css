@@ -852,6 +852,31 @@ button {
   color: var(--muted);
 }
 
+.product-page-section {
+  min-height: calc(100vh - 118px);
+}
+
+.product-page-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(300px, 1.05fr);
+  gap: clamp(24px, 5vw, 60px);
+  align-items: center;
+}
+
+.product-page-layout img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  object-fit: cover;
+}
+
+.product-page-copy h1 {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.1;
+}
+
 /* Footer */
 .site-footer {
   padding: 54px 22px 24px;
@@ -1069,7 +1094,8 @@ button {
   }
 
   .section-toolbar,
-  .quick-view-layout {
+  .quick-view-layout,
+  .product-page-layout {
     grid-template-columns: 1fr;
   }
 
