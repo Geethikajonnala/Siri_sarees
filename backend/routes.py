@@ -41,10 +41,79 @@ def _build_image_url(path_value: str):
 
 def _build_product_payload(product: Product):
     payload = product.to_payload()
-    payload["image_url"] = _build_image_url(payload.get("image_url"))
-    # Keep the legacy images array in API responses using the products.image_url value.
-    payload["images"] = [payload["image_url"]] if payload["image_url"] else []
+    raw_image_url = payload.get("image_url") or ""
+    image_list = [url.strip() for url in raw_image_url.split(",") if url.strip()]
+    payload["images"] = [_build_image_url(url) for url in image_list]
+    payload["image_url"] = payload["images"][0] if payload["images"] else ""
     return payload
+
+
+FABRIC_TERMS = (
+    "silk",
+    "cotton",
+    "linen",
+    "organza",
+    "chiffon",
+    "georgette",
+    "crepe",
+    "net",
+    "tissue",
+    "velvet",
+    "satin",
+    "banarasi",
+    "kanjivaram",
+    "kanchipuram",
+)
+
+COLOR_TERMS = (
+    "red",
+    "maroon",
+    "pink",
+    "green",
+    "blue",
+    "yellow",
+    "orange",
+    "purple",
+    "violet",
+    "lavender",
+    "black",
+    "white",
+    "ivory",
+    "cream",
+    "gold",
+    "golden",
+    "beige",
+    "peach",
+    "teal",
+    "navy",
+    "wine",
+    "coral",
+)
+
+
+def _product_search_text(payload):
+    return " ".join(
+        str(payload.get(field) or "").lower()
+        for field in ("name", "category", "description", "offer")
+    )
+
+
+def _matched_terms(payload, terms):
+    text = _product_search_text(payload)
+    return {term for term in terms if term in text}
+
+
+def _similarity_key(target, candidate):
+    target_price = float(target.get("price") or 0)
+    candidate_price = float(candidate.get("price") or 0)
+    price_delta = abs(candidate_price - target_price)
+
+    return (
+        str(candidate.get("category") or "").lower() == str(target.get("category") or "").lower(),
+        bool(_matched_terms(target, FABRIC_TERMS) & _matched_terms(candidate, FABRIC_TERMS)),
+        bool(_matched_terms(target, COLOR_TERMS) & _matched_terms(candidate, COLOR_TERMS)),
+        -price_delta,
+    )
 
 
 def _save_uploaded_image(uploaded_file):
@@ -75,8 +144,8 @@ def _get_uploaded_images():
     for uploaded_file in uploaded_files:
         if not uploaded_file or not uploaded_file.filename:
             continue
-        if len(image_urls) >= 1:
-            return None, "A product can have one image"
+        if len(image_urls) >= 3:
+            return None, "A product can have up to 3 images"
         image_url = _save_uploaded_image(uploaded_file)
         if image_url is None:
             return None, "Only JPG, PNG, and WEBP images are supported"
@@ -297,6 +366,27 @@ def get_product(product_id):
     return jsonify({"success": True, "product": payload})
 
 
+@api.get("/products/<product_id>/similar")
+def get_similar_products(product_id):
+    try:
+        target_product = Product.get_product(product_id)
+        products = Product.list_products()
+    except Exception as exc:
+        return _json_error(f"Unable to load similar products: {exc}", 500)
+
+    if not target_product:
+        return _json_error("Product not found", 404)
+
+    target = _build_product_payload(target_product)
+    candidates = [
+        _build_product_payload(product)
+        for product in products
+        if str(product.id) != str(product_id)
+    ]
+    similar_products = sorted(candidates, key=lambda item: _similarity_key(target, item), reverse=True)[:8]
+    return jsonify({"success": True, "products": similar_products})
+
+
 @api.post("/products")
 @require_admin_auth
 def create_product():
@@ -335,7 +425,7 @@ def create_product():
     image_url = data.get("image_url") or ""
     image_urls = uploaded_images or ([image_url] if image_url else [])
     if image_urls:
-        image_url = image_urls[0]
+        image_url = ",".join(image_urls)
 
     product = Product(
         id=str(uuid.uuid4()),
@@ -400,7 +490,7 @@ def update_product(product_id):
     if upload_error:
         return _json_error(upload_error, 400)
     if uploaded_images:
-        payload["image_url"] = uploaded_images[0]
+        payload["image_url"] = ",".join(uploaded_images)
 
     try:
         product = Product.get_product(product_id)

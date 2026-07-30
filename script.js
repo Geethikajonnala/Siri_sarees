@@ -267,8 +267,19 @@ function formatPrice(value) {
   return `Rs. ${value.toLocaleString("en-IN")}`;
 }
 
+function getPublicSiteBaseUrl() {
+  const configuredUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "").trim();
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  if (window.location.origin && window.location.origin !== "null") {
+    return window.location.origin.replace(/\/$/, "");
+  }
+
+  return "http://127.0.0.1:5000";
+}
+
 function getProductUrl(id) {
-  const productBaseUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "http://127.0.0.1:5000").replace(/\/$/, "");
+  const productBaseUrl = getPublicSiteBaseUrl();
   const productUrl = new URL("product.html", `${productBaseUrl}/`);
   productUrl.searchParams.set("id", id);
   return productUrl.href;

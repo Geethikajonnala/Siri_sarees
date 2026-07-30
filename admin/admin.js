@@ -49,9 +49,13 @@ function productImageUrls(product) {
 
 function hasTooManyImages(form, messageTarget) {
   const imageInput = form.querySelector('input[type="file"][name="image"]');
-  if (imageInput && imageInput.files.length > 1) {
-    showMessage(messageTarget, 'A product can have one image', 'error');
-    return true;
+  if (imageInput) {
+    const isMultiple = imageInput.hasAttribute('multiple');
+    const limit = isMultiple ? 3 : 1;
+    if (imageInput.files.length > limit) {
+      showMessage(messageTarget, `A product can have at most ${limit} image${limit > 1 ? 's' : ''}`, 'error');
+      return true;
+    }
   }
   return false;
 }
@@ -203,6 +207,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!authOk) return;
     const submitButton = addProductForm.querySelector('button');
     submitButton.dataset.originalText = submitButton.textContent;
+
+    const imageInput = addProductForm.querySelector('input[type="file"][name="image"]');
+    if (imageInput) {
+      imageInput.addEventListener('change', () => {
+        const display = addProductForm.querySelector('.selected-files');
+        if (display) {
+          if (imageInput.files.length > 0) {
+            const names = Array.from(imageInput.files).map((f) => f.name).join(', ');
+            display.textContent = `Selected: ${names}`;
+          } else {
+            display.textContent = '';
+          }
+        }
+      });
+    }
+
     addProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const formData = new FormData(addProductForm);
@@ -219,6 +239,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!response.ok) throw new Error(result.error || 'Unable to save product');
         showMessage(messageTarget, result.message || 'Product saved!', 'success');
         addProductForm.reset();
+        const display = addProductForm.querySelector('.selected-files');
+        if (display) display.textContent = '';
       } catch (error) {
         showMessage(messageTarget, error.message || 'Unable to save product', 'error');
       } finally {

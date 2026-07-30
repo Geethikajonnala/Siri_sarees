@@ -877,6 +877,14 @@ button {
   line-height: 1.1;
 }
 
+.similar-products-section {
+  margin-top: clamp(54px, 7vw, 86px);
+}
+
+.similar-products-section .product-card {
+  cursor: pointer;
+}
+
 /* Footer */
 .site-footer {
   padding: 54px 22px 24px;

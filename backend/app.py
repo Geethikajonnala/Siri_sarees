@@ -1,7 +1,7 @@
 from html import escape
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, current_app, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 from models import Product
@@ -28,6 +28,17 @@ def _replace_meta(html: str, name: str, content: str, *, attr: str = "property")
 
 def _replace_title(html: str, title: str) -> str:
     return html.replace("<title>Siri Saree Divine Product</title>", f"<title>{escape(title, quote=False)}</title>", 1)
+
+
+def _product_page_url(product_id: str | None) -> str:
+    public_site_url = (current_app.config.get("PUBLIC_SITE_URL") or "").rstrip("/")
+    if not public_site_url:
+        return request.url
+
+    product_url = f"{public_site_url}/product.html"
+    if product_id:
+        product_url = f"{product_url}?id={product_id}"
+    return product_url
 
 
 def _product_share_payload(product_id: str | None):
@@ -72,13 +83,14 @@ def create_app() -> Flask:
     @app.get("/product.html")
     def product_page():
         html = (FRONTEND_DIR / "product.html").read_text(encoding="utf-8")
-        title, description, image_url = _product_share_payload(request.args.get("id"))
+        product_id = request.args.get("id")
+        title, description, image_url = _product_share_payload(product_id)
         html = _replace_title(html, title)
         html = _replace_meta(html, "description", description, attr="name")
         html = _replace_meta(html, "og:title", title)
         html = _replace_meta(html, "og:description", description)
         html = _replace_meta(html, "og:image", image_url)
-        html = _replace_meta(html, "og:url", request.url)
+        html = _replace_meta(html, "og:url", _product_page_url(product_id))
         return html
 
     @app.get("/style.css")
