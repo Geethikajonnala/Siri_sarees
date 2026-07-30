@@ -5,7 +5,7 @@ function resolveProductImageUrl(imageUrl) {
   const normalizedUrl = (imageUrl || "").toString().trim();
   const apiOrigin = "http://127.0.0.1:5000";
   const supabaseUrl = (window.SSD_CONFIG?.SUPABASE_URL || "").replace(/\/$/, "");
-  const supabaseBucket = window.SSD_CONFIG?.SUPABASE_BUCKET || "product-images";
+  const supabaseBucket = window.SSD_CONFIG?.SUPABASE_BUCKET || "saree_images";
 
   if (!normalizedUrl) return fallbackImage;
   if (/^https?:\/\//i.test(normalizedUrl)) {
@@ -24,22 +24,34 @@ function resolveProductImageUrl(imageUrl) {
   return `${apiOrigin}/${normalizedUrl}`;
 }
 
+function productImageUrls(product) {
+  const urls = Array.isArray(product.images) && product.images.length > 0
+    ? product.images
+    : [product.image || product.image_url];
+  return urls.map(resolveProductImageUrl).filter(Boolean).slice(0, 4);
+}
+
 async function loadProductsFromBackend() {
   try {
     const response = await fetch("http://127.0.0.1:5000/api/products");
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Unable to load products");
-    products = (result.products || []).map((product) => ({
-      ...product,
-      id: product.id,
-      name: product.name,
-      category: product.category,
-      price: Number(product.price),
-      image: resolveProductImageUrl(product.image_url || "https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700"),
-      description: product.description || "Premium saree from Siri Sarees.",
-      colors: ["Classic", "Elegant"],
-      sizes: ["Regular Saree (5.5 Meters)"]
-    }));
+    products = (result.products || []).map((product) => {
+      const images = (Array.isArray(product.images) ? product.images : []).map(resolveProductImageUrl).filter(Boolean).slice(0, 4);
+      const image = images[0] || resolveProductImageUrl(product.image_url || "https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700");
+      return {
+        ...product,
+        id: product.id,
+        name: product.name,
+        category: product.category,
+        price: Number(product.price),
+        image,
+        images: images.length > 0 ? images : [image],
+        description: product.description || "Premium saree from Siri Sarees.",
+        colors: ["Classic", "Elegant"],
+        sizes: ["Regular Saree (5.5 Meters)"]
+      };
+    });
     return products;
   } catch (error) {
     console.error(error);
@@ -222,10 +234,6 @@ const selectors = {
   cartItems: document.querySelector("#cartItems"),
   cartEmpty: document.querySelector("#cartEmpty"),
   cartTotal: document.querySelector("#cartTotal"),
-  categoryResults: document.querySelector("#categoryResults"),
-  categoryGrid: document.querySelector("#categoryGrid"),
-  categoryTitle: document.querySelector("#categoryTitle"),
-  categoryLoading: document.querySelector("#categoryLoading"),
   moreCollections: document.querySelector("#moreCollections"),
   moreGrid: document.querySelector("#moreGrid"),
   moreLoading: document.querySelector("#moreLoading"),
@@ -292,7 +300,7 @@ function updateBadge(badge, value) {
 
 function productCard(product) {
   const wished = wishlist.includes(product.id);
-  const imageUrl = resolveProductImageUrl(product.image);
+  const imageUrl = productImageUrls(product)[0];
   console.log("[product-image]", imageUrl);
   return `
     <article class="product-card reveal visible" data-id="${product.id}">
@@ -365,26 +373,6 @@ function toggleLoading(loader, isLoading) {
   loader.classList.toggle("visible", isLoading);
 }
 
-async function openCategory(category) {
-  const activeProducts = await ensureProductsLoaded();
-  selectors.categoryResults.classList.add("open");
-  selectors.categoryTitle.textContent = category;
-  selectors.categoryGrid.innerHTML = "";
-  toggleLoading(selectors.categoryLoading, true);
-  selectors.categoryResults.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  setTimeout(() => {
-    const categoryProducts = activeProducts.filter((product) => product.category === category);
-    renderProductGrid(selectors.categoryGrid, categoryProducts);
-    toggleLoading(selectors.categoryLoading, false);
-  }, 350);
-}
-
-function closeCategory() {
-  selectors.categoryResults.classList.remove("open");
-  document.querySelector("#categories").scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 function openMoreCollections() {
   visibleMoreCount = 6;
   selectors.moreCollections.classList.add("open");
@@ -413,7 +401,7 @@ function closeMoreCollections() {
 function renderWishlist() {
   const wishlistProducts = wishlist.map(productById).filter(Boolean);
   selectors.wishlistItems.innerHTML = wishlistProducts.map((product) => {
-    const imageUrl = resolveProductImageUrl(product.image);
+    const imageUrl = productImageUrls(product)[0];
     return `
     <div class="panel-item">
       <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
@@ -437,7 +425,7 @@ function renderWishlist() {
 function renderCart() {
   const cartItems = cart.map((item) => ({ ...item, product: productById(item.id) })).filter((item) => item.product);
   selectors.cartItems.innerHTML = cartItems.map(({ product, quantity }) => {
-    const imageUrl = resolveProductImageUrl(product.image);
+    const imageUrl = productImageUrls(product)[0];
     return `
     <div class="panel-item cart-item">
       <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
@@ -466,10 +454,6 @@ function renderCart() {
 
 function rerenderOpenProductSurfaces() {
   filterProducts();
-  if (selectors.categoryResults.classList.contains("open")) {
-    const category = selectors.categoryTitle.textContent;
-    renderProductGrid(selectors.categoryGrid, products.filter((product) => product.category === category));
-  }
   if (selectors.moreCollections.classList.contains("open")) renderMoreCollections();
 }
 
@@ -525,11 +509,26 @@ function openQuickView(id) {
     `
     : "";
 
-  const imageUrl = resolveProductImageUrl(product.image);
+  const imageUrls = productImageUrls(product);
+  const imageUrl = imageUrls[0];
+  const thumbnailsMarkup = imageUrls.length > 1
+    ? `
+      <div class="quick-image-thumbs" aria-label="Product images">
+        ${imageUrls.map((url, index) => `
+          <button class="quick-image-thumb ${index === 0 ? "active" : ""}" type="button" data-quick-image="${url}" aria-label="View image ${index + 1}" aria-pressed="${index === 0 ? "true" : "false"}">
+            <img src="${url}" alt="${product.name} thumbnail ${index + 1}">
+          </button>
+        `).join("")}
+      </div>
+    `
+    : "";
   console.log("[product-image]", imageUrl);
   selectors.quickViewContent.innerHTML = `
     <div class="quick-view-layout">
-      <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+      <div class="quick-view-gallery">
+        <img id="quickViewMainImage" src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+        ${thumbnailsMarkup}
+      </div>
       <div>
         <p class="eyebrow">${product.category}</p>
         <h3>${product.name}</h3>
@@ -556,6 +555,17 @@ function openQuickView(id) {
   selectors.quickViewModal.classList.add("open");
   selectors.quickViewModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("panel-open");
+}
+
+function switchQuickViewImage(button) {
+  const mainImage = document.querySelector("#quickViewMainImage");
+  if (!mainImage) return;
+  mainImage.src = button.dataset.quickImage;
+  document.querySelectorAll(".quick-image-thumb").forEach((thumb) => {
+    const isActive = thumb === button;
+    thumb.classList.toggle("active", isActive);
+    thumb.setAttribute("aria-pressed", String(isActive));
+  });
 }
 
 function closeQuickView() {
@@ -651,6 +661,12 @@ function checkout() {
 }
 
 function handleProductClick(event) {
+  const imageButton = event.target.closest("[data-quick-image]");
+  if (imageButton) {
+    switchQuickViewImage(imageButton);
+    return;
+  }
+
   const wishlistButton = event.target.closest("[data-wishlist]");
   const cartButton = event.target.closest("[data-cart]");
   const quickButton = event.target.closest("[data-quick-view]");
@@ -678,17 +694,7 @@ selectors.mainNav.querySelectorAll("a").forEach((link) => {
   });
 });
 
-document.querySelectorAll(".category-card").forEach((card) => {
-  card.addEventListener("click", () => openCategory(card.dataset.category));
-  card.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openCategory(card.dataset.category);
-    }
-  });
-});
-
-[selectors.productGrid, selectors.categoryGrid, selectors.moreGrid, selectors.quickViewContent].forEach((container) => {
+[selectors.productGrid, selectors.moreGrid, selectors.quickViewContent].forEach((container) => {
   container.addEventListener("click", handleProductClick);
 });
 
@@ -722,8 +728,6 @@ document.querySelectorAll("[data-close-panel]").forEach((button) => {
 });
 
 selectors.panelOverlay.addEventListener("click", closePanels);
-document.querySelector("#closeCategory").addEventListener("click", closeCategory);
-document.querySelector("#closeCategoryX").addEventListener("click", closeCategory);
 document.querySelector("#viewMoreTrending").addEventListener("click", openMoreCollections);
 document.querySelector("#backToTrending").addEventListener("click", closeMoreCollections);
 document.querySelector("#closeMoreCollections").addEventListener("click", closeMoreCollections);

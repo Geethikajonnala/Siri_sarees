@@ -41,6 +41,21 @@ function getQueryParam(name) {
   return params.get(name);
 }
 
+function productImageUrls(product) {
+  const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url];
+  // The backend now stores one public image URL directly on products.image_url.
+  return images.filter(Boolean).slice(0, 1);
+}
+
+function hasTooManyImages(form, messageTarget) {
+  const imageInput = form.querySelector('input[type="file"][name="image"]');
+  if (imageInput && imageInput.files.length > 1) {
+    showMessage(messageTarget, 'A product can have one image', 'error');
+    return true;
+  }
+  return false;
+}
+
 function redirectIfUnauthenticated() {
   const currentPage = window.location.pathname.split('/').pop();
   if (currentPage === 'login.html') return;
@@ -143,7 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const products = result.products || [];
       tbody.innerHTML = products.map((product) => `
         <tr>
-          <td>${product.image_url ? `<img src="${product.image_url}" alt="${product.name}" class="table-image" />` : '<div class="product-thumb small">P</div>'}</td>
+          <td>${productImageUrls(product)[0] ? `<img src="${productImageUrls(product)[0]}" alt="${product.name}" class="table-image" />` : '<div class="product-thumb small">P</div>'}</td>
           <td>${product.name}</td>
           <td>${product.category}</td>
           <td>₹${Number(product.price).toLocaleString('en-IN')}</td>
@@ -192,6 +207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       event.preventDefault();
       const formData = new FormData(addProductForm);
       const messageTarget = document.querySelector('.form-status');
+      if (hasTooManyImages(addProductForm, messageTarget)) return;
       setLoading(submitButton, true);
       try {
         const response = await fetch(getApiUrl('/products'), {
@@ -232,6 +248,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         const descriptionField = editProductForm.querySelector('textarea');
         if (descriptionField) descriptionField.value = product.description || '';
+        const existingImages = document.querySelector('#existingImages');
+        if (existingImages) {
+          const images = productImageUrls(product);
+          existingImages.innerHTML = images.map((imageUrl, index) => `<img src="${imageUrl}" alt="${product.name} image ${index + 1}" />`).join('');
+        }
       } catch (error) {
         showMessage(document.querySelector('.form-status'), error.message, 'error');
       }
@@ -241,6 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const productId = getQueryParam('id');
       const formData = new FormData(editProductForm);
       const messageTarget = document.querySelector('.form-status');
+      if (hasTooManyImages(editProductForm, messageTarget)) return;
       setLoading(submitButton, true);
       try {
         const response = await fetch(getApiUrl(`/products/${productId}`), {

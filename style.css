@@ -342,15 +342,12 @@ button {
   font-size: clamp(2rem, 4vw, 3.3rem);
 }
 
-.category-grid,
 .product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
 }
 
-/* Category cards */
-.category-card,
 .product-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -360,21 +357,12 @@ button {
   transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
-.category-card:hover,
 .product-card:hover {
   transform: translateY(-8px);
   border-color: rgba(184, 134, 11, 0.45);
   box-shadow: var(--shadow);
 }
 
-.category-card {
-  position: relative;
-  min-height: 260px;
-  color: #FFFFFF;
-  cursor: pointer;
-}
-
-.category-card:focus-visible,
 .btn:focus-visible,
 .back-link:focus-visible,
 .close-section:focus-visible,
@@ -384,43 +372,9 @@ button {
   outline-offset: 3px;
 }
 
-.category-card img {
-  width: 100%;
-  height: 100%;
-  min-height: 260px;
-  object-fit: cover;
-  transition: transform 0.45s ease;
-}
-
-.category-card:hover img {
-  transform: scale(1.07);
-}
-
-.category-card::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(33, 23, 14, 0.02), rgba(33, 23, 14, 0.78));
-  content: "";
-}
-
-.category-card div {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  left: 20px;
-  z-index: 1;
-}
-
-.category-card h3,
 .product-card h3 {
   font-family: "Cinzel", Georgia, serif;
 }
-
-.category-card p {
-  color: rgba(255, 255, 255, 0.82);
-}
-
-
 
 .product-info p,
 .footer-grid p,
@@ -857,6 +811,35 @@ button {
   object-fit: cover;
 }
 
+.quick-view-gallery {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-image-thumbs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.quick-image-thumb {
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.quick-image-thumb.active {
+  border-color: var(--gold);
+}
+
+.quick-image-thumb img {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+
 .quick-view-layout h3 {
   margin: 8px 0;
   font-family: "Cinzel", Georgia, serif;
@@ -1007,7 +990,6 @@ button {
     margin: 0 auto;
   }
 
-  .category-grid,
   .product-grid,
   .footer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1057,7 +1039,6 @@ button {
     width: 100%;
   }
 
-  .category-grid,
   .product-grid,
   .footer-grid,
   .main-nav {

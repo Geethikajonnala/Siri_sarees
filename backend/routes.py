@@ -3,10 +3,9 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from pathlib import Path
 
 import jwt
-from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -15,9 +14,8 @@ from models import Product, db
 from supabase_client import supabase
 
 api = Blueprint("api", __name__)
-UPLOAD_FOLDER = Path(__file__).resolve().parent / "uploads"
-UPLOAD_FOLDER.mkdir(exist_ok=True)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+IMAGE_BUCKET = "saree_images"
 
 
 def _json_error(message: str, status: int = 400):
@@ -36,7 +34,55 @@ def _build_image_url(path_value: str):
         return ""
     if path_value.startswith("http://") or path_value.startswith("https://"):
         return path_value
-    return f"http://127.0.0.1:5000{path_value}" if not path_value.startswith("/") else f"http://127.0.0.1:5000{path_value}"
+
+    # Stored image paths are converted to public Supabase Storage URLs.
+    return supabase.storage.from_(IMAGE_BUCKET).get_public_url(path_value.lstrip("/"))
+
+
+def _build_product_payload(product: Product):
+    payload = product.to_payload()
+    payload["image_url"] = _build_image_url(payload.get("image_url"))
+    # Keep the legacy images array in API responses using the products.image_url value.
+    payload["images"] = [payload["image_url"]] if payload["image_url"] else []
+    return payload
+
+
+def _save_uploaded_image(uploaded_file):
+    extension = uploaded_file.filename.rsplit(".", 1)[1].lower() if "." in uploaded_file.filename else ""
+    if extension not in ALLOWED_EXTENSIONS:
+        return None
+    safe_name = secure_filename(uploaded_file.filename)
+    unique_name = f"{uuid.uuid4().hex}_{safe_name}"
+    storage_path = f"products/{unique_name}"
+    file_bytes = uploaded_file.read()
+    content_type = uploaded_file.mimetype or f"image/{extension}"
+
+    # Images are uploaded to Supabase Storage; the products table stores this public URL.
+    supabase.storage.from_(IMAGE_BUCKET).upload(
+        storage_path,
+        file_bytes,
+        file_options={"content-type": content_type},
+    )
+    return supabase.storage.from_(IMAGE_BUCKET).get_public_url(storage_path)
+
+
+def _get_uploaded_images():
+    uploaded_files = []
+    uploaded_files.extend(request.files.getlist("image"))
+    uploaded_files.extend(request.files.getlist("images"))
+    image_urls = []
+
+    for uploaded_file in uploaded_files:
+        if not uploaded_file or not uploaded_file.filename:
+            continue
+        if len(image_urls) >= 1:
+            return None, "A product can have one image"
+        image_url = _save_uploaded_image(uploaded_file)
+        if image_url is None:
+            return None, "Only JPG, PNG, and WEBP images are supported"
+        image_urls.append(image_url)
+
+    return image_urls, None
 
 
 def _get_request_payload():
@@ -233,9 +279,7 @@ def get_products():
         current_app.logger.warning("Unable to load products from Supabase: %s", exc)
         return _json_error(f"Unable to load products: {exc}", 500)
 
-    items = [product.to_payload() for product in products]
-    for item in items:
-        item["image_url"] = _build_image_url(item.get("image_url"))
+    items = [_build_product_payload(product) for product in products]
     return jsonify({"success": True, "products": items})
 
 
@@ -249,8 +293,7 @@ def get_product(product_id):
     if not product:
         return _json_error("Product not found", 404)
 
-    payload = product.to_payload()
-    payload["image_url"] = _build_image_url(payload.get("image_url"))
+    payload = _build_product_payload(product)
     return jsonify({"success": True, "product": payload})
 
 
@@ -281,20 +324,18 @@ def create_product():
     if stock < 0:
         return _json_error("Stock cannot be negative", 400)
 
-    image_url = data.get("image_url") or ""
-    uploaded_file = None
-    if "image" in request.files:
-        uploaded_file = request.files["image"]
+    try:
+        uploaded_images, upload_error = _get_uploaded_images()
+    except Exception as exc:
+        current_app.logger.warning("Supabase image upload failed: %s", exc)
+        return _json_error(f"Unable to upload image: {exc}", 500)
+    if upload_error:
+        return _json_error(upload_error, 400)
 
-    if uploaded_file and uploaded_file.filename:
-        extension = uploaded_file.filename.rsplit(".", 1)[1].lower() if "." in uploaded_file.filename else ""
-        if extension not in ALLOWED_EXTENSIONS:
-            return _json_error("Only JPG, PNG, and WEBP images are supported", 400)
-        safe_name = secure_filename(uploaded_file.filename)
-        unique_name = f"{uuid.uuid4().hex}_{safe_name}"
-        saved_path = UPLOAD_FOLDER / unique_name
-        uploaded_file.save(saved_path)
-        image_url = f"/uploads/{unique_name}"
+    image_url = data.get("image_url") or ""
+    image_urls = uploaded_images or ([image_url] if image_url else [])
+    if image_urls:
+        image_url = image_urls[0]
 
     product = Product(
         id=str(uuid.uuid4()),
@@ -312,7 +353,7 @@ def create_product():
     try:
         db.session.add(product)
         db.session.commit()
-        return jsonify({"success": True, "message": "Product created", "product": product.to_payload()})
+        return jsonify({"success": True, "message": "Product created", "product": _build_product_payload(product)})
     except Exception as exc:
         db.session.rollback()
         current_app.logger.warning("Supabase product create failed: %s", exc)
@@ -351,18 +392,15 @@ def update_product(product_id):
             else:
                 payload[field] = _normalize_text(value)
 
-    uploaded_file = None
-    if "image" in request.files:
-        uploaded_file = request.files["image"]
-    if uploaded_file and uploaded_file.filename:
-        extension = uploaded_file.filename.rsplit(".", 1)[1].lower() if "." in uploaded_file.filename else ""
-        if extension not in ALLOWED_EXTENSIONS:
-            return _json_error("Only JPG, PNG, and WEBP images are supported", 400)
-        safe_name = secure_filename(uploaded_file.filename)
-        unique_name = f"{uuid.uuid4().hex}_{safe_name}"
-        saved_path = UPLOAD_FOLDER / unique_name
-        uploaded_file.save(saved_path)
-        payload["image_url"] = f"/uploads/{unique_name}"
+    try:
+        uploaded_images, upload_error = _get_uploaded_images()
+    except Exception as exc:
+        current_app.logger.warning("Supabase image upload failed: %s", exc)
+        return _json_error(f"Unable to upload image: {exc}", 500)
+    if upload_error:
+        return _json_error(upload_error, 400)
+    if uploaded_images:
+        payload["image_url"] = uploaded_images[0]
 
     try:
         product = Product.get_product(product_id)
@@ -372,7 +410,7 @@ def update_product(product_id):
     if not product:
         return _json_error("Product not found", 404)
 
-    if not payload:
+    if not payload and not uploaded_images:
         return _json_error("No valid fields to update", 400)
 
     for field, value in payload.items():
@@ -382,7 +420,7 @@ def update_product(product_id):
     try:
         db.session.add(product)
         db.session.commit()
-        return jsonify({"success": True, "message": "Product updated", "product": product.to_payload()})
+        return jsonify({"success": True, "message": "Product updated", "product": _build_product_payload(product)})
     except Exception as exc:
         db.session.rollback()
         current_app.logger.warning("Supabase product update failed: %s", exc)
@@ -408,8 +446,3 @@ def delete_product(product_id):
         db.session.rollback()
         current_app.logger.warning("Supabase product delete failed: %s", exc)
         return _json_error(f"Unable to delete product: {exc}", 500)
-
-
-@api.get("/uploads/<path:filename>")
-def uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
