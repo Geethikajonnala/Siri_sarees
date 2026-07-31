@@ -12,8 +12,13 @@ const selectors = {
   cartItems: document.querySelector("#cartItems"),
   cartEmpty: document.querySelector("#cartEmpty"),
   cartTotal: document.querySelector("#cartTotal"),
-  floatWhatsApp: document.querySelector("#floatWhatsApp")
+  floatWhatsApp: document.querySelector("#floatWhatsApp"),
+  footerWhatsApp: document.querySelector("#footerWhatsApp")
 };
+
+if (selectors.footerWhatsApp) {
+  selectors.footerWhatsApp.href = `https://wa.me/${ssdWhatsAppNumber()}`;
+}
 
 let wishlist = ssdGetWishlist();
 let cart = ssdGetCart();
@@ -210,14 +215,28 @@ function renderSimilarProducts(products) {
   section.hidden = false;
 }
 
+function preloadImages(images) {
+  images.forEach((url) => {
+    const preloadEl = new Image();
+    preloadEl.src = url;
+  });
+}
+
 function galleryMarkup(images, name) {
   const hint = images.length > 1
     ? `<span class="gallery-view-hint"><i class="fa-solid fa-images"></i> View all ${images.length} photos</span>`
+    : "";
+  const arrows = images.length > 1
+    ? `
+      <button class="product-gallery-arrow prev" type="button" aria-label="Previous image"><i class="fa-solid fa-chevron-left"></i></button>
+      <button class="product-gallery-arrow next" type="button" aria-label="Next image"><i class="fa-solid fa-chevron-right"></i></button>
+    `
     : "";
   const mainImageBlock = `
     <div class="product-gallery-media">
       <img class="product-gallery-main" id="productMainImage" src="${images[0]}" alt="${name}" onerror="ssdImageError(this)">
       ${hint}
+      ${arrows}
     </div>
   `;
 
@@ -246,6 +265,7 @@ function renderProduct(product) {
   const description = product.description?.trim() || "A handpicked premium saree from Siri Saree Divine's curated collection.";
   const isWished = wishlist.includes(product.id);
 
+  preloadImages(images);
   updateProductMeta(product, images[0]);
   renderBreadcrumb(product);
 
@@ -352,6 +372,14 @@ function wireProductInteractions(product) {
     const thumbButton = event.target.closest("[data-gallery-index]");
     if (thumbButton) {
       setActiveGalleryIndex(Number(thumbButton.dataset.galleryIndex));
+      return;
+    }
+    if (event.target.closest(".product-gallery-arrow.prev")) {
+      setActiveGalleryIndex(activeGalleryIndex - 1);
+      return;
+    }
+    if (event.target.closest(".product-gallery-arrow.next")) {
+      setActiveGalleryIndex(activeGalleryIndex + 1);
       return;
     }
     if (event.target.closest("#productMainImage")) {
