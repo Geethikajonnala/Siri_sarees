@@ -860,8 +860,35 @@ button {
 }
 
 .quick-copy {
-  margin: 12px 0 20px;
+  margin: 12px 0 8px;
   color: var(--muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+.quick-copy.expanded {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
+}
+
+.description-toggle {
+  margin: 0 0 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.description-toggle[hidden] {
+  display: none;
 }
 
 .product-page-section {

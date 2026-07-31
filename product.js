@@ -278,7 +278,8 @@ function renderProduct(product) {
         <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
         <h1>${name}</h1>
         <p class="price">${ssdPriceMarkup(product)}</p>
-        <p class="quick-copy">${description}</p>
+        <p class="quick-copy" id="productDescription">${description}</p>
+        <button type="button" class="description-toggle" id="descriptionToggle" hidden>Read more</button>
 
         <div class="product-quantity-row">
           <label for="productQuantity">Quantity</label>
@@ -326,6 +327,16 @@ function currentQuantity() {
 }
 
 function wireProductInteractions(product) {
+  const descriptionEl = document.querySelector("#productDescription");
+  const descriptionToggle = document.querySelector("#descriptionToggle");
+  if (descriptionEl && descriptionToggle && descriptionEl.scrollHeight > descriptionEl.clientHeight + 1) {
+    descriptionToggle.hidden = false;
+    descriptionToggle.addEventListener("click", () => {
+      const expanded = descriptionEl.classList.toggle("expanded");
+      descriptionToggle.textContent = expanded ? "Show less" : "Read more";
+    });
+  }
+
   const qtyInput = document.querySelector("#productQuantity");
   document.querySelector("#qtyDecrease")?.addEventListener("click", () => {
     qtyInput.value = Math.max(1, currentQuantity() - 1);
