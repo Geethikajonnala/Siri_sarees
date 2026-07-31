@@ -31,10 +31,16 @@ function getQueryParam(name) {
 const MAX_PRODUCT_IMAGES = 4;
 
 function productImageUrls(product) {
-  const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url];
-  // Products can have up to MAX_PRODUCT_IMAGES images; image_url is stored as a
-  // comma-separated string and split back out wherever it's read.
-  return images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    return product.images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
+  }
+  // image_url is stored as a comma-separated string (up to MAX_PRODUCT_IMAGES
+  // images) -- split it back out into individual URLs.
+  return (product.image_url || '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .slice(0, MAX_PRODUCT_IMAGES);
 }
 
 // Drives a fixed grid of MAX_PRODUCT_IMAGES boxes (used by both Add Product and
