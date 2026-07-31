@@ -4,9 +4,6 @@
  */
 
 const SSD_FALLBACK_IMAGE = "https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700";
-const SSD_API_ORIGIN = "http://127.0.0.1:5000";
-
-const API_BASE = (window.SSD_CONFIG?.API_BASE || `${SSD_API_ORIGIN}/api`).replace(/\/$/, "");
 
 const ssdStoreKeys = { wishlist: "siriSareesWishlist", cart: "siriSareesCart" };
 const ssdProductCache = new Map();
@@ -18,25 +15,11 @@ function ssdResolveImageUrl(imageUrl) {
 
   if (!normalizedUrl) return SSD_FALLBACK_IMAGE;
 
-  if (/^https?:\/\//i.test(normalizedUrl)) {
-    try {
-      const url = new URL(normalizedUrl);
-      if (url.origin === SSD_API_ORIGIN && url.pathname.startsWith("/uploads/")) {
-        return `${SSD_API_ORIGIN}/api${url.pathname}`;
-      }
-    } catch {
-      /* fall through and use the URL as-is */
-    }
-    return normalizedUrl;
-  }
+  // Already a full URL (e.g. a Supabase Storage public URL) -- use as-is.
+  if (/^https?:\/\//i.test(normalizedUrl)) return normalizedUrl;
 
-  if (normalizedUrl.startsWith("/uploads/")) return `${SSD_API_ORIGIN}/api${normalizedUrl}`;
-  if (normalizedUrl.startsWith("uploads/")) return `${SSD_API_ORIGIN}/api/${normalizedUrl}`;
-  if (supabaseUrl && !normalizedUrl.startsWith("/") && !normalizedUrl.startsWith("storage/")) {
-    return `${supabaseUrl}/storage/v1/object/public/${supabaseBucket}/${normalizedUrl}`;
-  }
-  if (normalizedUrl.startsWith("/")) return `${SSD_API_ORIGIN}${normalizedUrl}`;
-  return `${SSD_API_ORIGIN}/${normalizedUrl}`;
+  // Legacy/relative storage path stored before the image URL was saved in full.
+  return `${supabaseUrl}/storage/v1/object/public/${supabaseBucket}/${normalizedUrl.replace(/^\/+/, "")}`;
 }
 
 function ssdProductImages(product) {
@@ -88,7 +71,7 @@ function ssdPublicSiteBaseUrl() {
   if (window.location.origin && window.location.origin !== "null") {
     return window.location.origin.replace(/\/$/, "");
   }
-  return SSD_API_ORIGIN;
+  return "";
 }
 
 function ssdProductUrl(productId) {
@@ -159,26 +142,84 @@ function ssdSetCart(list) {
   ssdWriteStore(ssdStoreKeys.cart, list);
 }
 
-async function ssdApiGet(path) {
-  const response = await fetch(`${API_BASE}${path}`);
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Request failed");
-  return result;
+// Maps a raw Supabase "products" row (image_url as a comma-separated string)
+// into the shape the storefront renders: images[] plus a first-image image_url.
+function ssdMapProductRow(row) {
+  if (!row) return null;
+  const rawImageUrl = row.image_url || "";
+  const images = rawImageUrl.split(",").map((url) => url.trim()).filter(Boolean).map(ssdResolveImageUrl);
+  return {
+    ...row,
+    price: Number(row.price),
+    stock: Number(row.stock),
+    images,
+    image_url: images[0] || ""
+  };
 }
 
 async function ssdFetchProduct(productId) {
-  const result = await ssdApiGet(`/products/${encodeURIComponent(productId)}`);
-  return result.product;
-}
-
-async function ssdFetchSimilarProducts(productId) {
-  const result = await ssdApiGet(`/products/${encodeURIComponent(productId)}/similar`);
-  return result.products || [];
+  const { data, error } = await window.supabaseClient
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .single();
+  if (error) throw new Error(error.message);
+  return ssdMapProductRow(data);
 }
 
 async function ssdFetchAllProducts() {
-  const result = await ssdApiGet("/products");
-  return result.products || [];
+  const { data, error } = await window.supabaseClient
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data || []).map(ssdMapProductRow);
+}
+
+// Ported from the old backend's /products/<id>/similar ranking: prefer same
+// category, then shared fabric words, then shared color words, then closest price.
+const SSD_FABRIC_TERMS = ["silk", "cotton", "linen", "organza", "chiffon", "georgette", "crepe", "net", "tissue", "velvet", "satin", "banarasi", "kanjivaram", "kanchipuram"];
+const SSD_COLOR_TERMS = ["red", "maroon", "pink", "green", "blue", "yellow", "orange", "purple", "violet", "lavender", "black", "white", "ivory", "cream", "gold", "golden", "beige", "peach", "teal", "navy", "wine", "coral"];
+
+function ssdProductSearchText(product) {
+  return ["name", "category", "description", "offer"].map((field) => String(product[field] || "").toLowerCase()).join(" ");
+}
+
+function ssdMatchedTerms(product, terms) {
+  const text = ssdProductSearchText(product);
+  return new Set(terms.filter((term) => text.includes(term)));
+}
+
+function ssdTermSetsOverlap(setA, setB) {
+  for (const term of setA) {
+    if (setB.has(term)) return true;
+  }
+  return false;
+}
+
+function ssdSimilarityScore(target, candidate) {
+  const priceDelta = Math.abs((Number(candidate.price) || 0) - (Number(target.price) || 0));
+  return [
+    String(candidate.category || "").toLowerCase() === String(target.category || "").toLowerCase() ? 1 : 0,
+    ssdTermSetsOverlap(ssdMatchedTerms(target, SSD_FABRIC_TERMS), ssdMatchedTerms(candidate, SSD_FABRIC_TERMS)) ? 1 : 0,
+    ssdTermSetsOverlap(ssdMatchedTerms(target, SSD_COLOR_TERMS), ssdMatchedTerms(candidate, SSD_COLOR_TERMS)) ? 1 : 0,
+    -priceDelta
+  ];
+}
+
+function ssdCompareScoresDesc(scoreA, scoreB) {
+  for (let index = 0; index < scoreA.length; index += 1) {
+    if (scoreA[index] !== scoreB[index]) return scoreB[index] - scoreA[index];
+  }
+  return 0;
+}
+
+async function ssdFetchSimilarProducts(productId) {
+  const [target, allProducts] = await Promise.all([ssdFetchProduct(productId), ssdFetchAllProducts()]);
+  return allProducts
+    .filter((product) => String(product.id) !== String(productId))
+    .sort((a, b) => ssdCompareScoresDesc(ssdSimilarityScore(target, a), ssdSimilarityScore(target, b)))
+    .slice(0, 8);
 }
 
 // Resolves a batch of product ids to product objects, using ssdProductCache and

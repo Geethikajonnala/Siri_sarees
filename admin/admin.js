@@ -1,8 +1,8 @@
-const API_BASE = 'http://127.0.0.1:5000/api';
 const FALLBACK_IMAGE = 'https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700';
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
-function getApiUrl(path) {
-  return `${API_BASE}${path}`;
+function supabaseBucket() {
+  return window.SSD_CONFIG?.SUPABASE_BUCKET || 'saree_images';
 }
 
 function handleImageError(imgEl) {
@@ -23,26 +23,6 @@ function setLoading(button, loading) {
   button.textContent = loading ? 'Please wait...' : button.dataset.originalText || button.textContent;
 }
 
-function getAuthHeaders(includeJson = false) {
-  const headers = {};
-  if (includeJson) headers['Content-Type'] = 'application/json';
-  return headers;
-}
-
-function getRequestOptions(method = 'GET', body = null, includeJson = false) {
-  const options = {
-    method,
-    credentials: 'include',
-    headers: getAuthHeaders(includeJson),
-  };
-
-  if (body !== null) {
-    options.body = body;
-  }
-
-  return options;
-}
-
 function getQueryParam(name) {
   const params = new URLSearchParams(window.location.search);
   return params.get(name);
@@ -52,8 +32,8 @@ const MAX_PRODUCT_IMAGES = 4;
 
 function productImageUrls(product) {
   const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url];
-  // Products can have up to MAX_PRODUCT_IMAGES images; the backend stores them as a
-  // comma-separated image_url and exposes them back as the `images` array (see routes.py).
+  // Products can have up to MAX_PRODUCT_IMAGES images; image_url is stored as a
+  // comma-separated string and split back out wherever it's read.
   return images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
 }
 
@@ -110,6 +90,10 @@ function setupImageSlots({ grid, fileInput, hint, initialImages = [] }) {
   fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
     if (!file || pendingIndex === null) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      alert('Only JPG, PNG, and WEBP images are supported');
+      return;
+    }
     if (slots[pendingIndex]?.type === 'new') URL.revokeObjectURL(slots[pendingIndex].previewUrl);
     slots[pendingIndex] = { type: 'new', file, previewUrl: URL.createObjectURL(file) };
     pendingIndex = null;
@@ -119,21 +103,28 @@ function setupImageSlots({ grid, fileInput, hint, initialImages = [] }) {
   render();
 
   return {
-    // Builds exactly what the backend expects: new files (in slot order) to attach
-    // under the repeated `image` field, the kept existing URLs (in slot order) for
-    // `keep_images`, and an `image_order` token per slot so the server can zip the
-    // two back together in the right positions (see routes.py update_product).
-    appendTo(formData) {
-      const order = [];
-      const keepUrls = [];
-      slots.forEach((slot) => {
-        if (!slot) { order.push('empty'); return; }
-        if (slot.type === 'existing') { order.push('keep'); keepUrls.push(slot.url); return; }
-        order.push('new');
-        formData.append('image', slot.file);
-      });
-      formData.append('keep_images', keepUrls.join(','));
-      formData.append('image_order', order.join(','));
+    // Uploads any newly-picked files straight to Supabase Storage, keeps
+    // existing image URLs as-is, drops removed slots, and returns the
+    // resulting comma-separated image_url (slot order preserved, gaps closed).
+    async resolveImageUrl() {
+      const bucket = supabaseBucket();
+      const resolved = [];
+      for (const slot of slots) {
+        if (!slot) continue;
+        if (slot.type === 'existing') {
+          resolved.push(slot.url);
+          continue;
+        }
+        const safeName = slot.file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const path = `products/${crypto.randomUUID()}_${safeName}`;
+        const { error: uploadError } = await window.supabaseClient.storage
+          .from(bucket)
+          .upload(path, slot.file, { contentType: slot.file.type });
+        if (uploadError) throw new Error(uploadError.message);
+        const { data } = window.supabaseClient.storage.from(bucket).getPublicUrl(path);
+        resolved.push(data.publicUrl);
+      }
+      return resolved.join(',');
     },
     setImages(urls) {
       slots.forEach((slot, index) => {
@@ -145,26 +136,17 @@ function setupImageSlots({ grid, fileInput, hint, initialImages = [] }) {
   };
 }
 
-function redirectIfUnauthenticated() {
-  const currentPage = window.location.pathname.split('/').pop();
-  if (currentPage === 'login.html') return;
-  const token = document.cookie.split('; ').find((item) => item.startsWith('token='));
-  if (!token) {
-    window.location.href = 'login.html';
-  }
-}
-
+// Redirects to login.html when there's no active Supabase Auth session.
+// Returns true (page may proceed) or false (already redirecting away).
 async function checkAuth() {
-  try {
-    const response = await fetch(getApiUrl('/auth/me'), { credentials: 'include' });
-    if (!response.ok) {
-      throw new Error('Unauthorized');
-    }
-    return true;
-  } catch {
-    redirectIfUnauthenticated();
+  const currentPage = window.location.pathname.split('/').pop();
+  if (currentPage === 'login.html') return true;
+  const { data: { session } } = await window.supabaseClient.auth.getSession();
+  if (!session) {
+    window.location.href = 'login.html';
     return false;
   }
+  return true;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -174,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (link.getAttribute('href') === 'login.html') {
         event.preventDefault();
         try {
-          await fetch(getApiUrl('/auth/logout'), { method: 'POST', credentials: 'include' });
+          await window.supabaseClient.auth.signOut();
         } catch {
           // Ignore network errors; redirect to login regardless.
         } finally {
@@ -193,15 +175,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     submitButton.dataset.originalText = submitButton.textContent;
     loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const username = loginForm.querySelector('input[type="text"]').value.trim();
+      const email = loginForm.querySelector('input[type="text"]').value.trim();
       const password = loginForm.querySelector('input[type="password"]').value;
       const messageTarget = document.querySelector('.login-message');
       setLoading(submitButton, true);
       try {
-        const response = await fetch(getApiUrl('/auth/login'), getRequestOptions('POST', JSON.stringify({ username, password }), true));
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Invalid login');
-        showMessage(messageTarget, result.message || 'Login successful', 'success');
+        const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw new Error(error.message);
+        showMessage(messageTarget, 'Login successful', 'success');
         window.location.href = 'dashboard.html';
       } catch (error) {
         showMessage(messageTarget, error.message || 'Unable to login', 'error');
@@ -216,10 +197,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const authOk = await checkAuth();
     if (!authOk) return;
     try {
-      const response = await fetch(getApiUrl('/products'), { credentials: 'include' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Unable to load products');
-      const products = result.products || [];
+      const { data, error } = await window.supabaseClient.from('products').select('*');
+      if (error) throw new Error(error.message);
+      const products = data || [];
       const totalProducts = products.length;
       const categories = [...new Set(products.map((product) => product.category).filter(Boolean))].length;
       const lowStock = products.filter((product) => Number(product.stock) <= 5).length;
@@ -252,10 +232,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const tbody = productsTable.querySelector('tbody');
     const messageTarget = document.querySelector('.panel-header p');
     try {
-      const response = await fetch(getApiUrl('/products'), { credentials: 'include' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Unable to load products');
-      const products = result.products || [];
+      const { data, error } = await window.supabaseClient.from('products').select('*').order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      const products = data || [];
       tbody.innerHTML = products.map((product) => `
         <tr>
           <td>${productImageUrls(product)[0] ? `<img src="${productImageUrls(product)[0]}" alt="${product.name}" class="table-image" onerror="handleImageError(this)" />` : '<div class="product-thumb small">P</div>'}</td>
@@ -271,7 +250,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </td>
         </tr>
       `).join('');
-      if (messageTarget) messageTarget.textContent = 'Products loaded from the backend.';
+      if (messageTarget) messageTarget.textContent = 'Products loaded.';
     } catch (error) {
       tbody.innerHTML = `<tr><td colspan="6">${error.message}</td></tr>`;
       if (messageTarget) messageTarget.textContent = error.message;
@@ -284,12 +263,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const id = deleteButton.dataset.deleteId;
       if (!window.confirm('Delete this product?')) return;
       try {
-        const response = await fetch(getApiUrl(`/products/${id}`), {
-          method: 'DELETE',
-          credentials: 'include'
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Delete failed');
+        const { error } = await window.supabaseClient.from('products').delete().eq('id', id);
+        if (error) throw new Error(error.message);
         window.location.reload();
       } catch (error) {
         alert(error.message || 'Delete failed');
@@ -312,19 +287,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     addProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const formData = new FormData(addProductForm);
-      imageSlots.appendTo(formData);
       const messageTarget = document.querySelector('.form-status');
       setLoading(submitButton, true);
       try {
-        const response = await fetch(getApiUrl('/products'), {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
+        const name = addProductForm.querySelector('[name="name"]').value.trim();
+        const category = addProductForm.querySelector('[name="category"]').value.trim();
+        const price = Number(addProductForm.querySelector('[name="price"]').value);
+        const stock = Number(addProductForm.querySelector('[name="stock"]').value);
+        if (!name || !category) throw new Error('Name and category are required');
+        if (!(price > 0)) throw new Error('Price must be greater than zero');
+        if (!(stock >= 0)) throw new Error('Stock cannot be negative');
+
+        const imageUrl = await imageSlots.resolveImageUrl();
+        const nowIso = new Date().toISOString();
+        const { error } = await window.supabaseClient.from('products').insert({
+          id: crypto.randomUUID(),
+          name,
+          category,
+          description: addProductForm.querySelector('[name="description"]').value.trim(),
+          offer: addProductForm.querySelector('[name="offer"]').value.trim(),
+          price,
+          stock,
+          image_url: imageUrl,
+          created_at: nowIso,
+          updated_at: nowIso
         });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Unable to save product');
-        showMessage(messageTarget, result.message || 'Product saved!', 'success');
+        if (error) throw new Error(error.message);
+
+        showMessage(messageTarget, 'Product saved!', 'success');
         addProductForm.reset();
         imageSlots.setImages([]);
       } catch (error) {
@@ -351,10 +341,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (productId) {
       try {
-        const response = await fetch(getApiUrl(`/products/${productId}`), { credentials: 'include' });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Product not found');
-        const product = result.product || {};
+        const { data: product, error } = await window.supabaseClient.from('products').select('*').eq('id', productId).single();
+        if (error) throw new Error(error.message);
         editProductForm.querySelectorAll('input, textarea').forEach((field) => {
           const name = field.name || field.getAttribute('placeholder');
           if (!name) return;
@@ -373,19 +361,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       event.preventDefault();
       const productId = getQueryParam('id');
       const messageTarget = document.querySelector('.form-status');
-      const formData = new FormData(editProductForm);
-      imageSlots.appendTo(formData);
       setLoading(submitButton, true);
       try {
-        const response = await fetch(getApiUrl(`/products/${productId}`), {
-          method: 'PUT',
-          body: formData,
-          credentials: 'include'
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Unable to update product');
-        showMessage(messageTarget, result.message || 'Product updated!', 'success');
-        imageSlots.setImages(productImageUrls(result.product || {}));
+        const price = Number(editProductForm.querySelector('[name="price"]').value);
+        const stock = Number(editProductForm.querySelector('[name="stock"]').value);
+        if (!(price > 0)) throw new Error('Price must be greater than zero');
+        if (!(stock >= 0)) throw new Error('Stock cannot be negative');
+
+        const imageUrl = await imageSlots.resolveImageUrl();
+        const { data: product, error } = await window.supabaseClient.from('products').update({
+          name: editProductForm.querySelector('[name="name"]').value.trim(),
+          category: editProductForm.querySelector('[name="category"]').value.trim(),
+          description: editProductForm.querySelector('[name="description"]').value.trim(),
+          offer: editProductForm.querySelector('[name="offer"]').value.trim(),
+          price,
+          stock,
+          image_url: imageUrl,
+          updated_at: new Date().toISOString()
+        }).eq('id', productId).select().single();
+        if (error) throw new Error(error.message);
+
+        showMessage(messageTarget, 'Product updated!', 'success');
+        imageSlots.setImages(productImageUrls(product || {}));
       } catch (error) {
         showMessage(messageTarget, error.message || 'Unable to update product', 'error');
       } finally {
