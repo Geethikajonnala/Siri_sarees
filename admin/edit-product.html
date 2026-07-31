@@ -68,7 +68,8 @@
 
             <label>
               Image Upload
-              <input type="file" name="image" accept="image/png,image/jpeg,image/webp" />
+              <input type="file" name="image" accept="image/png,image/jpeg,image/webp" multiple />
+              <div class="selected-files" style="margin-top: 5px; font-size: 0.9em; color: var(--muted); font-weight: normal;"></div>
             </label>
             <div class="image-preview-list" id="existingImages" aria-label="Existing product images"></div>
 

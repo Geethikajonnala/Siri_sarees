@@ -69,10 +69,18 @@
           </label>
 
           <label>
-            Image Upload
-            <input type="file" name="image" accept="image/png,image/jpeg,image/webp" multiple />
-            <div class="selected-files"
-              style="margin-top: 5px; font-size: 0.9em; color: var(--muted); font-weight: normal;"></div>
+            Front View Image
+            <input type="file" name="image_front" accept="image/png,image/jpeg,image/webp" required />
+          </label>
+
+          <label>
+            Pallu Image
+            <input type="file" name="image_pallu" accept="image/png,image/jpeg,image/webp" required />
+          </label>
+
+          <label>
+            Border Image
+            <input type="file" name="image_border" accept="image/png,image/jpeg,image/webp" required />
           </label>
 
           <p class="form-status" aria-live="polite"></p>

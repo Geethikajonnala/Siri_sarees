@@ -128,14 +128,41 @@ function renderSimilarProducts(products) {
 
 function renderProduct(product) {
   const section = document.querySelector("#productPage");
-  const imageUrl = productImageUrls(product)[0];
-  updateProductMeta(product, imageUrl);
+  const images = productImageUrls(product);
+  const mainImageUrl = images[0];
+  updateProductMeta(product, mainImageUrl);
+
+  let galleryHtml = '';
+  if (images.length > 1) {
+    const thumbsHtml = images.map((img, idx) => `
+      <button class="quick-image-thumb ${idx === 0 ? 'active' : ''}" data-index="${idx}" aria-label="View image ${idx + 1}">
+        <img src="${img}" alt="${product.name} thumbnail ${idx + 1}">
+      </button>
+    `).join('');
+
+    galleryHtml = `
+      <div class="quick-view-gallery">
+        <div class="main-image-container" style="position: relative;">
+          <button class="gallery-nav prev" aria-label="Previous image" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.8); border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--text-dark, #333);"><i class="fa-solid fa-chevron-left"></i></button>
+          <img id="mainProductImage" src="${mainImageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+          <button class="gallery-nav next" aria-label="Next image" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.8); border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: var(--text-dark, #333);"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+        <div class="quick-image-thumbs">
+          ${thumbsHtml}
+        </div>
+      </div>
+    `;
+  } else {
+    galleryHtml = `
+      <div class="quick-view-gallery">
+        <img src="${mainImageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
+      </div>
+    `;
+  }
 
   section.innerHTML = `
     <div class="product-page-layout">
-      <div class="quick-view-gallery">
-        <img src="${imageUrl}" alt="${product.name}" onerror="console.error('Image load failed:', this.src); this.onerror=null;">
-      </div>
+      ${galleryHtml}
       <div class="product-page-copy">
         <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
         <h1>${product.name}</h1>
@@ -155,6 +182,36 @@ function renderProduct(product) {
   `;
 
   document.querySelector("#buyProduct").addEventListener("click", () => buyProduct(product));
+
+  if (images.length > 1) {
+    let currentIndex = 0;
+    const mainImage = document.getElementById("mainProductImage");
+    const thumbs = document.querySelectorAll(".quick-image-thumb");
+    const prevBtn = document.querySelector(".gallery-nav.prev");
+    const nextBtn = document.querySelector(".gallery-nav.next");
+
+    function updateGallery(index) {
+      currentIndex = index;
+      mainImage.src = images[currentIndex];
+      thumbs.forEach((t, idx) => {
+        t.classList.toggle("active", idx === currentIndex);
+      });
+    }
+
+    thumbs.forEach(thumb => {
+      thumb.addEventListener("click", () => updateGallery(parseInt(thumb.dataset.index, 10)));
+    });
+
+    prevBtn.addEventListener("click", () => {
+      const newIndex = currentIndex === 0 ? images.length - 1 : currentIndex - 1;
+      updateGallery(newIndex);
+    });
+
+    nextBtn.addEventListener("click", () => {
+      const newIndex = currentIndex === images.length - 1 ? 0 : currentIndex + 1;
+      updateGallery(newIndex);
+    });
+  }
 }
 
 async function initializeProductPage() {

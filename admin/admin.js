@@ -43,8 +43,7 @@ function getQueryParam(name) {
 
 function productImageUrls(product) {
   const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image_url];
-  // The backend now stores one public image URL directly on products.image_url.
-  return images.filter(Boolean).slice(0, 1);
+  return images.filter(Boolean).slice(0, 3);
 }
 
 function hasTooManyImages(form, messageTarget) {
@@ -208,20 +207,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const submitButton = addProductForm.querySelector('button');
     submitButton.dataset.originalText = submitButton.textContent;
 
-    const imageInput = addProductForm.querySelector('input[type="file"][name="image"]');
-    if (imageInput) {
-      imageInput.addEventListener('change', () => {
-        const display = addProductForm.querySelector('.selected-files');
-        if (display) {
-          if (imageInput.files.length > 0) {
-            const names = Array.from(imageInput.files).map((f) => f.name).join(', ');
-            display.textContent = `Selected: ${names}`;
-          } else {
-            display.textContent = '';
-          }
-        }
-      });
-    }
 
     addProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -239,8 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!response.ok) throw new Error(result.error || 'Unable to save product');
         showMessage(messageTarget, result.message || 'Product saved!', 'success');
         addProductForm.reset();
-        const display = addProductForm.querySelector('.selected-files');
-        if (display) display.textContent = '';
+
       } catch (error) {
         showMessage(messageTarget, error.message || 'Unable to save product', 'error');
       } finally {
@@ -279,6 +263,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage(document.querySelector('.form-status'), error.message, 'error');
       }
     }
+
+    const imageInput = editProductForm.querySelector('input[type="file"][name="image"]');
+    if (imageInput) {
+      imageInput.addEventListener('change', () => {
+        const display = editProductForm.querySelector('.selected-files');
+        if (display) {
+          if (imageInput.files.length > 0) {
+            const names = Array.from(imageInput.files).map((f) => f.name).join(', ');
+            display.textContent = `Selected: ${names}`;
+          } else {
+            display.textContent = '';
+          }
+        }
+      });
+    }
+
     editProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const productId = getQueryParam('id');
