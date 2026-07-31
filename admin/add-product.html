@@ -5,6 +5,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Add Product | Siri Sarees Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="admin.css" />
 </head>
 
@@ -20,10 +24,10 @@
       </a>
 
       <nav class="sidebar-nav">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="products.html">Products</a>
-        <a href="add-product.html" class="active">Add Product</a>
-        <a href="login.html">Logout</a>
+        <a href="dashboard.html"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+        <a href="products.html"><i class="fa-solid fa-list"></i> Products</a>
+        <a href="add-product.html" class="active"><i class="fa-solid fa-plus"></i> Add Product</a>
+        <a href="login.html"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</a>
       </nav>
     </aside>
 
@@ -68,15 +72,15 @@
             <input type="text" name="offer" placeholder="e.g. 10% off" />
           </label>
 
-          <p style="margin: 0 0 8px; font-weight: 600;">Product Images
-            <span style="font-weight: normal; font-size: 0.85em; color: var(--muted);">&mdash; the first box is the main photo shown to customers</span>
+          <p class="image-upload-label">Product Images
+            <span class="hint">&mdash; the first box is the main photo shown to customers</span>
           </p>
           <div class="image-slot-grid" id="imageSlotGrid"></div>
-          <p class="image-count-hint" id="imageSlotHint" style="margin: -8px 0 16px; font-size: 0.85em; color: var(--muted);"></p>
+          <p class="image-count-hint" id="imageSlotHint"></p>
           <input type="file" id="slotFileInput" accept="image/png,image/jpeg,image/webp" hidden />
 
           <p class="form-status" aria-live="polite"></p>
-          <button type="submit" class="btn btn-primary">Save Product</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Product</button>
         </form>
       </section>
     </main>

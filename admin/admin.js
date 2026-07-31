@@ -20,7 +20,7 @@ function showMessage(target, message, kind = 'error') {
 function setLoading(button, loading) {
   if (!button) return;
   button.disabled = loading;
-  button.textContent = loading ? 'Please wait...' : button.dataset.originalText || button.textContent;
+  button.innerHTML = loading ? 'Please wait...' : button.dataset.originalHtml || button.innerHTML;
 }
 
 function getQueryParam(name) {
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginForm = document.querySelector('.login-form');
   if (loginForm) {
     const submitButton = loginForm.querySelector('button');
-    submitButton.dataset.originalText = submitButton.textContent;
+    submitButton.dataset.originalHtml = submitButton.innerHTML;
     loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const email = loginForm.querySelector('input[type="text"]').value.trim();
@@ -250,8 +250,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <td>${product.stock}</td>
           <td>
             <div class="action-group">
-              <a href="edit-product.html?id=${product.id}" class="btn btn-secondary">Edit</a>
-              <button type="button" class="btn btn-muted" data-delete-id="${product.id}">Delete</button>
+              <a href="edit-product.html?id=${product.id}" class="btn btn-secondary"><i class="fa-solid fa-pen"></i> Edit</a>
+              <button type="button" class="btn btn-muted" data-delete-id="${product.id}"><i class="fa-solid fa-trash"></i> Delete</button>
             </div>
           </td>
         </tr>
@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const authOk = await checkAuth();
     if (!authOk) return;
     const submitButton = addProductForm.querySelector('button');
-    submitButton.dataset.originalText = submitButton.textContent;
+    submitButton.dataset.originalHtml = submitButton.innerHTML;
 
     const imageSlots = setupImageSlots({
       grid: addProductForm.querySelector('#imageSlotGrid'),
@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!authOk) return;
     const productId = getQueryParam('id');
     const submitButton = editProductForm.querySelector('button');
-    submitButton.dataset.originalText = submitButton.textContent;
+    submitButton.dataset.originalHtml = submitButton.innerHTML;
 
     const imageSlots = setupImageSlots({
       grid: editProductForm.querySelector('#imageSlotGrid'),
