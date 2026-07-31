@@ -78,10 +78,15 @@ function ssdPublicSiteBaseUrl() {
   return "";
 }
 
+// Links to the pre-generated static page for this product (see
+// scripts/generate-product-pages.mjs) rather than product.html?id=... --
+// that's a real per-product HTML file with the correct title/description/
+// image already baked in, so WhatsApp/Facebook/Google see the right preview
+// even though their crawlers don't run JavaScript.
 function ssdProductUrl(productId) {
-  const url = new URL("product.html", `${ssdPublicSiteBaseUrl()}/`);
-  if (productId) url.searchParams.set("id", productId);
-  return url.href;
+  const base = `${ssdPublicSiteBaseUrl()}/`;
+  if (!productId) return new URL("product.html", base).href;
+  return new URL(`products/${encodeURIComponent(productId)}.html`, base).href;
 }
 
 function ssdWhatsAppNumber() {

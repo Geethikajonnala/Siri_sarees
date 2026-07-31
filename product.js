@@ -439,7 +439,11 @@ function renderNotFound(message) {
 }
 
 async function initializeProductPage() {
-  const productId = new URLSearchParams(window.location.search).get("id");
+  // Pre-generated pages (products/<id>.html) carry the id in a meta tag;
+  // product.html?id=... (old links, direct testing) still works via the
+  // query string fallback.
+  const productId = document.querySelector('meta[name="product-id"]')?.content
+    || new URLSearchParams(window.location.search).get("id");
 
   if (!productId) {
     renderNotFound("Product not found");

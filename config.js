@@ -2,7 +2,7 @@ window.SSD_CONFIG = {
   // Production domain (no trailing slash). Used to build canonical/OG URLs,
   // sitemap links, and absolute product links shared over WhatsApp. Leave
   // empty to fall back to the current origin (useful for local/dev previews).
-  PUBLIC_SITE_URL: "",
+  PUBLIC_SITE_URL: "https://geethikajonnala.github.io/Siri_sarees",
 
   // Store Owner's WhatsApp Number (International format without '+' prefix or spaces)
   WHATSAPP_NUMBER: "918019655336",
