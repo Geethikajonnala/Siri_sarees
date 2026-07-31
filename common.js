@@ -69,7 +69,11 @@ function ssdPublicSiteBaseUrl() {
   const configuredUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "").trim();
   if (configuredUrl) return configuredUrl.replace(/\/$/, "");
   if (window.location.origin && window.location.origin !== "null") {
-    return window.location.origin.replace(/\/$/, "");
+    // Include the current directory, not just the origin -- required on hosts
+    // that serve the site from a subpath (e.g. GitHub Pages project sites like
+    // user.github.io/repo-name/), otherwise generated links drop that prefix.
+    const currentDir = window.location.pathname.replace(/[^/]*$/, "");
+    return `${window.location.origin}${currentDir}`.replace(/\/$/, "");
   }
   return "";
 }
