@@ -435,18 +435,25 @@ def create_product():
     if stock < 0:
         return _json_error("Stock cannot be negative", 400)
 
+    image_front = request.files.get("image_front")
+    image_pallu = request.files.get("image_pallu")
+    image_border = request.files.get("image_border")
+
+    if not image_front or not image_pallu or not image_border:
+        return _json_error("Front View, Pallu, and Border images are required", 400)
+
     try:
-        uploaded_images, upload_error = _get_uploaded_images()
+        front_url = _save_uploaded_image(image_front)
+        pallu_url = _save_uploaded_image(image_pallu)
+        border_url = _save_uploaded_image(image_border)
     except Exception as exc:
         current_app.logger.warning("Supabase image upload failed: %s", exc)
         return _json_error(f"Unable to upload image: {exc}", 500)
-    if upload_error:
-        return _json_error(upload_error, 400)
 
-    image_url = data.get("image_url") or ""
-    image_urls = uploaded_images or ([image_url] if image_url else [])
-    if image_urls:
-        image_url = ",".join(image_urls)
+    if not front_url or not pallu_url or not border_url:
+        return _json_error("Only JPG, PNG, and WEBP images are supported", 400)
+
+    image_url = f"{front_url},{pallu_url},{border_url}"
 
     product = Product(
         id=str(uuid.uuid4()),
@@ -464,6 +471,16 @@ def create_product():
     try:
         db.session.add(product)
         db.session.commit()
+        
+        try:
+            supabase.table("product_images").insert([
+                {"product_id": product.id, "image_url": front_url, "image_type": "front", "sort_order": 1},
+                {"product_id": product.id, "image_url": pallu_url, "image_type": "pallu", "sort_order": 2},
+                {"product_id": product.id, "image_url": border_url, "image_type": "border", "sort_order": 3}
+            ]).execute()
+        except Exception as exc:
+            current_app.logger.warning("Supabase product_images insert failed: %s", exc)
+
         return jsonify({"success": True, "message": "Product created", "product": _build_product_payload(product)})
     except Exception as exc:
         db.session.rollback()
