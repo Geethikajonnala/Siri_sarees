@@ -8,9 +8,10 @@
   --muted: #6D604E;
   --line: rgba(139, 111, 71, 0.2);
   --shadow: 0 16px 40px rgba(71, 45, 12, 0.12);
-  --radius: 10px;
+  --radius: 8px;
   --card: #FFFFFF;
   --danger: #7D231E;
+  --danger-hover: #5c1a15;
   --success: #167f3b;
   --success-soft: #e8f6eb;
   --warning: #a25a00;
@@ -119,6 +120,11 @@ body.login-page {
 .sidebar-nav a.active {
   background: rgba(212, 167, 106, 0.16);
   color: var(--ivory);
+}
+
+.sidebar-nav a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
 }
 
 .sidebar-nav a.active i,
@@ -266,6 +272,11 @@ body.login-page {
 
 .text-link:hover {
   color: var(--deep-gold);
+}
+
+.text-link:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .table-wrapper {
@@ -509,9 +520,15 @@ textarea {
   transition: border-color 0.2s ease, color 0.2s ease;
 }
 
-.image-slot.empty:hover {
+.image-slot.empty:hover,
+.image-slot.empty:focus-visible {
   border-color: var(--gold);
   color: var(--deep-gold);
+}
+
+.image-slot.empty:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .image-slot.empty .plus-icon {
@@ -546,7 +563,12 @@ textarea {
 }
 
 .image-slot-remove:hover {
-  background: #5c1a15;
+  background: var(--danger-hover);
+}
+
+.image-slot-remove:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .image-slot-badge {
