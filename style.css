@@ -1519,9 +1519,17 @@ button {
 
 @media (max-width: 940px) {
   .product-page-nav {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    flex-wrap: wrap;
+    display: none;
+  }
+
+  .product-brand {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .product-brand .brand-mark {
+    margin-bottom: 0;
   }
 
   .product-gallery {
