@@ -169,12 +169,37 @@ function updateProductMeta(product, imageUrl) {
   const name = product.name || "Siri Saree Divine Product";
   const title = `${name} | Siri Saree Divine`;
   const description = product.description || `${name} for ${ssdFormatPrice(product.price)}.`;
+  const url = ssdProductUrl(product.id);
   document.title = title;
   setMeta('meta[name="description"]', description);
   setMeta('meta[property="og:title"]', title);
   setMeta('meta[property="og:description"]', description);
   setMeta('meta[property="og:image"]', imageUrl);
-  setMeta('meta[property="og:url"]', ssdProductUrl(product.id));
+  setMeta('meta[property="og:url"]', url);
+  setMeta('meta[name="twitter:title"]', title);
+  setMeta('meta[name="twitter:description"]', description);
+  setMeta('meta[name="twitter:image"]', imageUrl);
+  document.querySelector("#canonicalLink")?.setAttribute("href", url);
+
+  const jsonLd = document.querySelector("#productJsonLd");
+  if (jsonLd) {
+    jsonLd.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name,
+      description,
+      image: imageUrl,
+      url,
+      brand: { "@type": "Brand", name: "Siri Saree Divine" },
+      offers: {
+        "@type": "Offer",
+        url,
+        priceCurrency: "INR",
+        price: ssdFinalPrice(product),
+        availability: "https://schema.org/InStock"
+      }
+    });
+  }
 }
 
 function renderBreadcrumb(product) {
