@@ -1,12 +1,21 @@
 :root {
-  --bg: #f5f5f7;
-  --card: #ffffff;
-  --text: #222222;
-  --muted: #6f6f78;
-  --border: #e7e7eb;
-  --primary: #800020;
-  --primary-soft: #f7e8ed;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  --gold: #B8860B;
+  --deep-gold: #8B6F47;
+  --soft-gold: #D4A76A;
+  --cream: #FFF8EA;
+  --ivory: #FFFCF5;
+  --ink: #21170E;
+  --muted: #6D604E;
+  --line: rgba(139, 111, 71, 0.2);
+  --shadow: 0 16px 40px rgba(71, 45, 12, 0.12);
+  --radius: 8px;
+  --card: #FFFFFF;
+  --danger: #7D231E;
+  --danger-hover: #5c1a15;
+  --success: #167f3b;
+  --success-soft: #e8f6eb;
+  --warning: #a25a00;
+  --warning-soft: #fff3e7;
 }
 
 * {
@@ -15,9 +24,9 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", Roboto, Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: "Inter", Arial, sans-serif;
+  background: var(--cream);
+  color: var(--ink);
 }
 
 body.login-page {
@@ -34,8 +43,8 @@ body.login-page {
 
 .sidebar {
   width: 250px;
-  background: #111111;
-  color: #f7f7f7;
+  background: linear-gradient(180deg, #2A1A08, var(--ink));
+  color: var(--ivory);
   padding: 24px 18px;
   position: sticky;
   top: 0;
@@ -52,15 +61,17 @@ body.login-page {
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--primary), #b93959);
-  color: white;
+  background: linear-gradient(135deg, var(--soft-gold), var(--gold));
+  color: var(--ink);
   font-weight: 700;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
 .brand-mark img {
@@ -72,31 +83,53 @@ body.login-page {
 .brand-block h2,
 .brand-block p {
   margin: 0;
+  font-family: "Cinzel", Georgia, serif;
 }
 
 .brand-block p {
-  color: #b7b7bb;
-  font-size: 0.9rem;
+  color: var(--soft-gold);
+  font-size: 0.85rem;
+  font-family: "Inter", Arial, sans-serif;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sidebar-nav a {
-  color: #f0f0f2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 252, 245, 0.78);
   text-decoration: none;
   padding: 12px 14px;
-  border-radius: 10px;
-  transition: background 0.2s ease;
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-nav a i {
+  width: 18px;
+  text-align: center;
+  color: var(--soft-gold);
 }
 
 .sidebar-nav a:hover,
 .sidebar-nav a.active {
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
+  background: rgba(212, 167, 106, 0.16);
+  color: var(--ivory);
+}
+
+.sidebar-nav a:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.sidebar-nav a.active i,
+.sidebar-nav a:hover i {
+  color: var(--gold);
 }
 
 .main-content {
@@ -113,15 +146,18 @@ body.login-page {
 
 .topbar h1 {
   margin: 0;
-  font-size: 1.75rem;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 1.7rem;
+  color: var(--ink);
 }
 
 .topbar-chip {
-  background: var(--primary-soft);
-  color: var(--primary);
-  padding: 8px 12px;
+  background: rgba(184, 134, 11, 0.12);
+  color: var(--deep-gold);
+  padding: 8px 14px;
   border-radius: 999px;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .stats-grid {
@@ -134,8 +170,8 @@ body.login-page {
 .stat-card,
 .panel-card {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
   box-shadow: var(--shadow);
 }
 
@@ -147,13 +183,22 @@ body.login-page {
 }
 
 .stat-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.stat-label i {
+  color: var(--gold);
 }
 
 .stat-card strong {
+  font-family: "Cinzel", Georgia, serif;
   font-size: 2rem;
-  color: var(--primary);
+  color: var(--gold);
 }
 
 .panel-card {
@@ -169,6 +214,8 @@ body.login-page {
 
 .panel-header h3 {
   margin: 0;
+  font-family: "Cinzel", Georgia, serif;
+  color: var(--ink);
 }
 
 .panel-header p {
@@ -187,8 +234,9 @@ body.login-page {
   justify-content: space-between;
   gap: 12px;
   padding: 14px;
-  background: #fafafb;
-  border-radius: 14px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 .product-item h4,
@@ -204,21 +252,31 @@ body.login-page {
 .stock-badge {
   padding: 7px 10px;
   border-radius: 999px;
-  background: #e8f6eb;
-  color: #167f3b;
+  background: var(--success-soft);
+  color: var(--success);
   font-size: 0.85rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .stock-badge.low {
-  background: #fff3e7;
-  color: #a25a00;
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .text-link {
-  color: var(--primary);
+  color: var(--gold);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.text-link:hover {
+  color: var(--deep-gold);
+}
+
+.text-link:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .table-wrapper {
@@ -234,29 +292,37 @@ th,
 td {
   padding: 12px 10px;
   text-align: left;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 
 th {
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+tbody tr:hover {
+  background: rgba(212, 167, 106, 0.08);
 }
 
 .product-thumb {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   display: grid;
   place-items: center;
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: rgba(184, 134, 11, 0.14);
+  color: var(--deep-gold);
+  font-family: "Cinzel", Georgia, serif;
   font-weight: 700;
 }
 
 .product-thumb.small {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .action-group {
@@ -266,29 +332,49 @@ th {
 
 .btn {
   border: none;
-  border-radius: 10px;
+  border-radius: 999px;
   cursor: pointer;
-  padding: 10px 14px;
-  font-weight: 600;
+  padding: 10px 16px;
+  font-weight: 700;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn:focus-visible {
+  outline: 3px solid rgba(184, 134, 11, 0.38);
+  outline-offset: 3px;
 }
 
 .btn-primary {
-  background: var(--primary);
-  color: white;
+  background: linear-gradient(135deg, #FFE1A0, var(--soft-gold), var(--gold));
+  color: var(--ink);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(184, 134, 11, 0.32);
 }
 
 .btn-secondary {
-  background: var(--primary-soft);
-  color: var(--primary);
+  background: rgba(184, 134, 11, 0.12);
+  color: var(--deep-gold);
+}
+
+.btn-secondary:hover {
+  background: rgba(184, 134, 11, 0.2);
 }
 
 .btn-muted {
-  background: #f1f1f3;
-  color: var(--text);
+  background: rgba(125, 35, 30, 0.08);
+  color: var(--danger);
+}
+
+.btn-muted:hover {
+  background: rgba(125, 35, 30, 0.16);
 }
 
 .login-shell {
@@ -296,43 +382,62 @@ th {
 }
 
 .login-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 32px;
+  background: var(--ivory);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 36px 32px;
   box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.login-card .brand-mark {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
 }
 
 .login-card h1 {
   margin: 12px 0 8px;
+  font-family: "Cinzel", Georgia, serif;
   font-size: 1.6rem;
+  color: var(--ink);
 }
 
 .login-card p {
-  margin: 0 0 20px;
+  margin: 0 0 24px;
   color: var(--muted);
 }
 
 .login-form {
   display: grid;
   gap: 14px;
+  text-align: left;
 }
 
 label {
   display: grid;
   gap: 8px;
-  color: var(--text);
+  color: var(--ink);
   font-weight: 600;
 }
 
 input,
 textarea {
   width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 11px 14px;
   font: inherit;
-  background: #fcfcfd;
+  background: var(--ivory);
+  color: var(--ink);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus,
+textarea:focus {
+  outline: 0;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.16);
 }
 
 textarea {
@@ -347,23 +452,42 @@ textarea {
 .form-status {
   margin: 0 0 10px;
   font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .form-message.error,
 .form-status.error {
-  color: #b42318;
+  color: var(--danger);
 }
 
 .form-message.success,
 .form-status.success {
-  color: #167f3b;
+  color: var(--success);
 }
 
 .table-image {
   width: 48px;
   height: 48px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 8px;
+}
+
+.image-upload-label {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.image-upload-label .hint {
+  font-weight: 400;
+  font-size: 0.85em;
+  color: var(--muted);
+}
+
+.image-count-hint {
+  margin: -8px 0 16px;
+  font-size: 0.85em;
+  color: var(--muted);
 }
 
 .image-slot-grid {
@@ -377,7 +501,7 @@ textarea {
 .image-slot {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
@@ -386,9 +510,9 @@ textarea {
   place-items: center;
   gap: 4px;
   padding: 6px;
-  border: 2px dashed var(--border);
-  border-radius: 12px;
-  background: #fafafb;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--cream);
   color: var(--muted);
   font-size: 0.78rem;
   text-align: center;
@@ -396,14 +520,21 @@ textarea {
   transition: border-color 0.2s ease, color 0.2s ease;
 }
 
-.image-slot.empty:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+.image-slot.empty:hover,
+.image-slot.empty:focus-visible {
+  border-color: var(--gold);
+  color: var(--deep-gold);
+}
+
+.image-slot.empty:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .image-slot.empty .plus-icon {
   font-size: 1.6rem;
   line-height: 1;
+  color: var(--gold);
 }
 
 .image-slot.filled img {
@@ -421,7 +552,7 @@ textarea {
   height: 22px;
   border: 2px solid #ffffff;
   border-radius: 50%;
-  background: #b42318;
+  background: var(--danger);
   color: #ffffff;
   font-size: 0.85rem;
   line-height: 1;
@@ -432,7 +563,12 @@ textarea {
 }
 
 .image-slot-remove:hover {
-  background: #8f1b13;
+  background: var(--danger-hover);
+}
+
+.image-slot-remove:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .image-slot-badge {
@@ -441,7 +577,7 @@ textarea {
   left: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(33, 23, 14, 0.72);
   color: #ffffff;
   font-size: 0.62rem;
   font-weight: 700;

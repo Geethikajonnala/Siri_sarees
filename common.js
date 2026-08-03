@@ -69,15 +69,24 @@ function ssdPublicSiteBaseUrl() {
   const configuredUrl = (window.SSD_CONFIG?.PUBLIC_SITE_URL || "").trim();
   if (configuredUrl) return configuredUrl.replace(/\/$/, "");
   if (window.location.origin && window.location.origin !== "null") {
-    return window.location.origin.replace(/\/$/, "");
+    // Include the current directory, not just the origin -- required on hosts
+    // that serve the site from a subpath (e.g. GitHub Pages project sites like
+    // user.github.io/repo-name/), otherwise generated links drop that prefix.
+    const currentDir = window.location.pathname.replace(/[^/]*$/, "");
+    return `${window.location.origin}${currentDir}`.replace(/\/$/, "");
   }
   return "";
 }
 
+// Links to the pre-generated static page for this product (see
+// scripts/generate-product-pages.mjs) rather than product.html?id=... --
+// that's a real per-product HTML file with the correct title/description/
+// image already baked in, so WhatsApp/Facebook/Google see the right preview
+// even though their crawlers don't run JavaScript.
 function ssdProductUrl(productId) {
-  const url = new URL("product.html", `${ssdPublicSiteBaseUrl()}/`);
-  if (productId) url.searchParams.set("id", productId);
-  return url.href;
+  const base = `${ssdPublicSiteBaseUrl()}/`;
+  if (!productId) return new URL("product.html", base).href;
+  return new URL(`products/${encodeURIComponent(productId)}.html`, base).href;
 }
 
 function ssdWhatsAppNumber() {

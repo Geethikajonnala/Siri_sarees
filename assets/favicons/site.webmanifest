@@ -1,0 +1,21 @@
+{
+  "name": "Siri Saree Divine",
+  "short_name": "Siri Saree Divine",
+  "description": "Premium silk, cotton, Banarasi, Mysore silk, georgette, and designer sarees.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#FFFCF5",
+  "theme_color": "#B8860B",
+  "icons": [
+    {
+      "src": "/assets/favicons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/favicons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

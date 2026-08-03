@@ -12,8 +12,13 @@ const selectors = {
   cartItems: document.querySelector("#cartItems"),
   cartEmpty: document.querySelector("#cartEmpty"),
   cartTotal: document.querySelector("#cartTotal"),
-  floatWhatsApp: document.querySelector("#floatWhatsApp")
+  floatWhatsApp: document.querySelector("#floatWhatsApp"),
+  footerWhatsApp: document.querySelector("#footerWhatsApp")
 };
+
+if (selectors.footerWhatsApp) {
+  selectors.footerWhatsApp.href = `https://wa.me/${ssdWhatsAppNumber()}`;
+}
 
 let wishlist = ssdGetWishlist();
 let cart = ssdGetCart();
@@ -164,12 +169,37 @@ function updateProductMeta(product, imageUrl) {
   const name = product.name || "Siri Saree Divine Product";
   const title = `${name} | Siri Saree Divine`;
   const description = product.description || `${name} for ${ssdFormatPrice(product.price)}.`;
+  const url = ssdProductUrl(product.id);
   document.title = title;
   setMeta('meta[name="description"]', description);
   setMeta('meta[property="og:title"]', title);
   setMeta('meta[property="og:description"]', description);
   setMeta('meta[property="og:image"]', imageUrl);
-  setMeta('meta[property="og:url"]', ssdProductUrl(product.id));
+  setMeta('meta[property="og:url"]', url);
+  setMeta('meta[name="twitter:title"]', title);
+  setMeta('meta[name="twitter:description"]', description);
+  setMeta('meta[name="twitter:image"]', imageUrl);
+  document.querySelector("#canonicalLink")?.setAttribute("href", url);
+
+  const jsonLd = document.querySelector("#productJsonLd");
+  if (jsonLd) {
+    jsonLd.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name,
+      description,
+      image: imageUrl,
+      url,
+      brand: { "@type": "Brand", name: "Siri Saree Divine" },
+      offers: {
+        "@type": "Offer",
+        url,
+        priceCurrency: "INR",
+        price: ssdFinalPrice(product),
+        availability: "https://schema.org/InStock"
+      }
+    });
+  }
 }
 
 function renderBreadcrumb(product) {
@@ -210,14 +240,28 @@ function renderSimilarProducts(products) {
   section.hidden = false;
 }
 
+function preloadImages(images) {
+  images.forEach((url) => {
+    const preloadEl = new Image();
+    preloadEl.src = url;
+  });
+}
+
 function galleryMarkup(images, name) {
   const hint = images.length > 1
     ? `<span class="gallery-view-hint"><i class="fa-solid fa-images"></i> View all ${images.length} photos</span>`
+    : "";
+  const arrows = images.length > 1
+    ? `
+      <button class="product-gallery-arrow prev" type="button" aria-label="Previous image"><i class="fa-solid fa-chevron-left"></i></button>
+      <button class="product-gallery-arrow next" type="button" aria-label="Next image"><i class="fa-solid fa-chevron-right"></i></button>
+    `
     : "";
   const mainImageBlock = `
     <div class="product-gallery-media">
       <img class="product-gallery-main" id="productMainImage" src="${images[0]}" alt="${name}" onerror="ssdImageError(this)">
       ${hint}
+      ${arrows}
     </div>
   `;
 
@@ -246,6 +290,7 @@ function renderProduct(product) {
   const description = product.description?.trim() || "A handpicked premium saree from Siri Saree Divine's curated collection.";
   const isWished = wishlist.includes(product.id);
 
+  preloadImages(images);
   updateProductMeta(product, images[0]);
   renderBreadcrumb(product);
 
@@ -258,7 +303,8 @@ function renderProduct(product) {
         <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
         <h1>${name}</h1>
         <p class="price">${ssdPriceMarkup(product)}</p>
-        <p class="quick-copy">${description}</p>
+        <p class="quick-copy" id="productDescription">${description}</p>
+        <button type="button" class="description-toggle" id="descriptionToggle" hidden>Read more</button>
 
         <div class="product-quantity-row">
           <label for="productQuantity">Quantity</label>
@@ -306,6 +352,16 @@ function currentQuantity() {
 }
 
 function wireProductInteractions(product) {
+  const descriptionEl = document.querySelector("#productDescription");
+  const descriptionToggle = document.querySelector("#descriptionToggle");
+  if (descriptionEl && descriptionToggle && descriptionEl.scrollHeight > descriptionEl.clientHeight + 1) {
+    descriptionToggle.hidden = false;
+    descriptionToggle.addEventListener("click", () => {
+      const expanded = descriptionEl.classList.toggle("expanded");
+      descriptionToggle.textContent = expanded ? "Show less" : "Read more";
+    });
+  }
+
   const qtyInput = document.querySelector("#productQuantity");
   document.querySelector("#qtyDecrease")?.addEventListener("click", () => {
     qtyInput.value = Math.max(1, currentQuantity() - 1);
@@ -354,6 +410,14 @@ function wireProductInteractions(product) {
       setActiveGalleryIndex(Number(thumbButton.dataset.galleryIndex));
       return;
     }
+    if (event.target.closest(".product-gallery-arrow.prev")) {
+      setActiveGalleryIndex(activeGalleryIndex - 1);
+      return;
+    }
+    if (event.target.closest(".product-gallery-arrow.next")) {
+      setActiveGalleryIndex(activeGalleryIndex + 1);
+      return;
+    }
     if (event.target.closest("#productMainImage")) {
       ssdOpenLightbox(galleryImages, product.name || "Siri Saree", activeGalleryIndex, setActiveGalleryIndex);
     }
@@ -375,7 +439,11 @@ function renderNotFound(message) {
 }
 
 async function initializeProductPage() {
-  const productId = new URLSearchParams(window.location.search).get("id");
+  // Pre-generated pages (products/<id>.html) carry the id in a meta tag;
+  // product.html?id=... (old links, direct testing) still works via the
+  // query string fallback.
+  const productId = document.querySelector('meta[name="product-id"]')?.content
+    || new URLSearchParams(window.location.search).get("id");
 
   if (!productId) {
     renderNotFound("Product not found");

@@ -205,7 +205,9 @@ const selectors = {
   moreLoading: document.querySelector("#moreLoading"),
   loadMoreProducts: document.querySelector("#loadMoreProducts"),
   quickViewModal: document.querySelector("#quickViewModal"),
-  quickViewContent: document.querySelector("#quickViewContent")
+  quickViewContent: document.querySelector("#quickViewContent"),
+  floatWhatsApp: document.querySelector("#floatWhatsApp"),
+  footerWhatsApp: document.querySelector("#footerWhatsApp")
 };
 
 let wishlist = ssdGetWishlist();
@@ -703,6 +705,15 @@ const observer = new IntersectionObserver(
 
 document.querySelectorAll(".reveal").forEach((item) => observer.observe(item));
 window.addEventListener("scroll", updateHeaderState);
+
+if (selectors.floatWhatsApp) {
+  const message = "Hi Siri Sarees Divine! I'd like to know more about your sarees.";
+  selectors.floatWhatsApp.href = `https://wa.me/${ssdWhatsAppNumber()}?text=${encodeURIComponent(message)}`;
+  selectors.floatWhatsApp.hidden = false;
+}
+if (selectors.footerWhatsApp) {
+  selectors.footerWhatsApp.href = `https://wa.me/${ssdWhatsAppNumber()}`;
+}
 async function initializeStore() {
   await ensureProductsLoaded();
   await renderTrending();
