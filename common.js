@@ -83,10 +83,19 @@ function ssdPublicSiteBaseUrl() {
 // that's a real per-product HTML file with the correct title/description/
 // image already baked in, so WhatsApp/Facebook/Google see the right preview
 // even though their crawlers don't run JavaScript.
+//
+// Only products with a UUID id have a generated static page under
+// products/<id>.html. Non-UUID ids (e.g. the fallback product list in
+// script.js) and any DB product added after the last generate-product-pages
+// run have no static file, so linking to products/<id>.html would 404 on
+// GitHub Pages. Fall back to product.html?id=<id> for those -- it's a real
+// deployed page that loads the product client-side.
 function ssdProductUrl(productId) {
   const base = `${ssdPublicSiteBaseUrl()}/`;
   if (!productId) return new URL("product.html", base).href;
-  return new URL(`products/${encodeURIComponent(productId)}.html`, base).href;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(productId));
+  if (isUuid) return new URL(`products/${encodeURIComponent(productId)}.html`, base).href;
+  return new URL(`product.html?id=${encodeURIComponent(productId)}`, base).href;
 }
 
 function ssdWhatsAppNumber() {
