@@ -264,6 +264,18 @@ body.login-page {
   color: var(--warning);
 }
 
+/* Low-stock indicator: the stock number turns red and a red "Low Stock"
+   badge is shown next to it for any product with stock <= LOW_STOCK_THRESHOLD. */
+.stock-value.low {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.stock-badge.low-stock {
+  background: rgba(125, 35, 30, 0.12);
+  color: var(--danger);
+}
+
 .text-link {
   color: var(--gold);
   text-decoration: none;

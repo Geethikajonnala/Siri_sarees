@@ -57,6 +57,41 @@ function ssdFinalPrice(product) {
   return ssdPriceBreakdown(product).final;
 }
 
+// ---- Stock status helpers (shared by the storefront cards, quick view, and
+// the product details page). Uses only the stock value returned from Supabase
+// (never hardcoded) and drives the badge text, color, and whether ordering is
+// allowed. ----
+
+// Stock at or below this number is treated as effectively unavailable.
+const SSD_STOCK_OUT_THRESHOLD = 0;
+// Stock at or below this number is shown as "Low Stock".
+const SSD_STOCK_LOW_THRESHOLD = 5;
+
+// Returns { level, label, disabled } for a product's stock value.
+//   level  : "out" | "low" | "in"
+//   label  : human-readable badge text ("Out of Stock", "Only 1 Left", "Low Stock", "In Stock")
+//   disabled: true when the product cannot be ordered (stock === 0)
+function ssdStockStatus(stock) {
+  const value = Number(stock) || 0;
+  if (value <= SSD_STOCK_OUT_THRESHOLD) {
+    return { level: "out", label: "Out of Stock", disabled: true };
+  }
+  if (value === 1) {
+    return { level: "low-one", label: "Only 1 Left", disabled: false };
+  }
+  if (value <= SSD_STOCK_LOW_THRESHOLD) {
+    return { level: "low", label: "Low Stock", disabled: false };
+  }
+  return { level: "in", label: "In Stock", disabled: false };
+}
+
+// Returns the badge markup for a product card / details page. Pass
+// `showInStock = false` to omit the green "In Stock" badge for healthy stock.
+function ssdStockBadge(product, { showInStock = true } = {}) {
+  const { level, label } = ssdStockStatus(product.stock);
+  return `<span class="stock-badge stock-${level}">${label}</span>`;
+}
+
 function ssdPriceMarkup(product) {
   const { original, final, discountPercent } = ssdPriceBreakdown(product);
   if (discountPercent > 0 && final < original) {

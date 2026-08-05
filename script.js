@@ -254,9 +254,14 @@ function productCard(product) {
   const name = product.name || "Siri Saree";
   const { discountPercent } = ssdPriceBreakdown(product);
   const offerBadge = discountPercent > 0 ? `<span class="offer-badge">${discountPercent}% OFF</span>` : "";
+  const stock = ssdStockStatus(product.stock);
+  const stockBadge = ssdStockBadge(product, { showInStock: false });
+  const orderDisabledAttr = stock.disabled ? " disabled" : "";
+  const orderLabel = stock.disabled ? "Out of Stock" : '<i class="fa-brands fa-whatsapp"></i> Order Now';
   return `
     <article class="product-card reveal visible" data-id="${product.id}" tabindex="0" aria-label="View ${name}">
       ${offerBadge}
+      ${stockBadge}
       <button class="wishlist-btn ${wished ? "active" : ""}" type="button" data-wishlist="${product.id}" aria-label="${wished ? "Remove" : "Add"} ${name} ${wished ? "from" : "to"} wishlist">
         <i class="${wished ? "fa-solid" : "fa-regular"} fa-heart"></i>
       </button>
@@ -267,9 +272,7 @@ function productCard(product) {
         <p class="price">${ssdPriceMarkup(product)}</p>
         <div class="product-actions">
           <button class="quick-view" type="button" data-quick-view="${product.id}">Quick View</button>
-          <button class="order-now-btn" type="button" data-order-now="${product.id}">
-            <i class="fa-brands fa-whatsapp"></i> Order Now
-          </button>
+          <button class="order-now-btn" type="button" data-order-now="${product.id}"${orderDisabledAttr}>${orderLabel}</button>
         </div>
       </div>
     </article>
@@ -421,6 +424,8 @@ function toggleWishlist(id) {
 }
 
 function addToCart(id, button) {
+  const product = productById(id);
+  if (product && ssdStockStatus(product.stock).disabled) return;
   const existingItem = cart.find((item) => item.id === id);
   if (existingItem) {
     existingItem.quantity += 1;
@@ -454,7 +459,7 @@ function openQuickView(id) {
   const hint = quickViewImages.length > 1
     ? `<span class="gallery-view-hint"><i class="fa-solid fa-images"></i> View all ${quickViewImages.length} photos</span>`
     : "";
-  const thumbnailsMarkup = quickViewImages.length > 1
+const thumbnailsMarkup = quickViewImages.length > 1
     ? `
       <div class="quick-image-thumbs" aria-label="Product images">
         ${quickViewImages.map((url, index) => `
@@ -465,6 +470,12 @@ function openQuickView(id) {
       </div>
     `
     : "";
+  const stock = ssdStockStatus(product.stock);
+  const stockBadge = ssdStockBadge(product, { showInStock: false });
+  const addCartDisabled = stock.disabled ? " disabled" : "";
+  const addCartLabel = stock.disabled ? "Out of Stock" : "Add to Cart";
+  const orderDisabled = stock.disabled ? " disabled" : "";
+  const orderLabel = stock.disabled ? "Out of Stock" : '<i class="fa-brands fa-whatsapp"></i> Order Now';
   selectors.quickViewContent.innerHTML = `
     <div class="quick-view-layout">
       <div class="quick-view-gallery">
@@ -477,6 +488,7 @@ function openQuickView(id) {
       <div>
         <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
         <h3>${name}</h3>
+        ${stockBadge && stock.level !== "in" ? `<div class="quick-stock-row">${stockBadge}</div>` : ""}
         <p class="price">${ssdPriceMarkup(product)}</p>
         <p class="quick-copy">${product.description || "Premium saree from Siri Sarees."}</p>
 
@@ -484,10 +496,8 @@ function openQuickView(id) {
           <button class="quick-view" type="button" data-wishlist="${product.id}">
             ${wishlist.includes(product.id) ? "Remove from Wishlist" : "Add to Wishlist"}
           </button>
-          <button class="add-cart" type="button" data-cart="${product.id}">Add to Cart</button>
-          <button class="order-now-btn" type="button" data-order-now="${product.id}">
-            <i class="fa-brands fa-whatsapp"></i> Order Now
-          </button>
+          <button class="add-cart" type="button" data-cart="${product.id}"${addCartDisabled}>${addCartLabel}</button>
+          <button class="order-now-btn" type="button" data-order-now="${product.id}"${orderDisabled}>${orderLabel}</button>
         </div>
       </div>
     </div>

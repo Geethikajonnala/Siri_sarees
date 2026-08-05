@@ -124,6 +124,8 @@ function toggleWishlist(id) {
 }
 
 function addToCart(id, quantity = 1) {
+  const product = productById(id);
+  if (product && ssdStockStatus(product.stock).disabled) return;
   const existingItem = cart.find((item) => item.id === id);
   if (existingItem) {
     existingItem.quantity += quantity;
@@ -289,6 +291,12 @@ function renderProduct(product) {
   const name = product.name || "Siri Saree";
   const description = product.description?.trim() || "A handpicked premium saree from Siri Saree Divine's curated collection.";
   const isWished = wishlist.includes(product.id);
+  const stock = ssdStockStatus(product.stock);
+  const stockMarkup = ssdStockBadge(product, { showInStock: true });
+  const orderDisabled = stock.disabled ? " disabled" : "";
+  const addCartLabel = stock.disabled ? "Out of Stock" : "Add to Cart";
+  const buyLabel = stock.disabled ? "Out of Stock" : '<i class="fa-brands fa-whatsapp"></i> Buy on WhatsApp';
+  const qtyDisabled = stock.disabled ? " disabled" : "";
 
   preloadImages(images);
   updateProductMeta(product, images[0]);
@@ -302,6 +310,7 @@ function renderProduct(product) {
       <div class="product-page-copy">
         <p class="eyebrow">${product.category || "Siri Saree Divine"}</p>
         <h1>${name}</h1>
+        <div class="product-stock-row">${stockMarkup}</div>
         <p class="price">${ssdPriceMarkup(product)}</p>
         <p class="quick-copy" id="productDescription">${description}</p>
         <button type="button" class="description-toggle" id="descriptionToggle" hidden>Read more</button>
@@ -309,9 +318,9 @@ function renderProduct(product) {
         <div class="product-quantity-row">
           <label for="productQuantity">Quantity</label>
           <div class="quantity-stepper">
-            <button type="button" id="qtyDecrease" aria-label="Decrease quantity">&minus;</button>
+            <button type="button" id="qtyDecrease" aria-label="Decrease quantity"${qtyDisabled}>&minus;</button>
             <input type="text" id="productQuantity" value="1" inputmode="numeric" aria-label="Quantity" readonly>
-            <button type="button" id="qtyIncrease" aria-label="Increase quantity">&plus;</button>
+            <button type="button" id="qtyIncrease" aria-label="Increase quantity"${qtyDisabled}>&plus;</button>
           </div>
         </div>
 
@@ -319,10 +328,8 @@ function renderProduct(product) {
           <button class="quick-view" type="button" data-toggle-wishlist="${product.id}">
             <i class="fa-${isWished ? "solid" : "regular"} fa-heart"></i> ${isWished ? "Saved to Wishlist" : "Add to Wishlist"}
           </button>
-          <button class="add-cart" type="button" id="addToCartBtn">Add to Cart</button>
-          <button class="order-now-btn" type="button" id="buyProduct">
-            <i class="fa-brands fa-whatsapp"></i> Buy on WhatsApp
-          </button>
+          <button class="add-cart" type="button" id="addToCartBtn"${orderDisabled}>${addCartLabel}</button>
+          <button class="order-now-btn" type="button" id="buyProduct"${orderDisabled}>${buyLabel}</button>
         </div>
 
         <p class="whatsapp-note"><i class="fa-brands fa-whatsapp"></i> Order directly on WhatsApp &mdash; no account needed</p>

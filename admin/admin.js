@@ -1,6 +1,24 @@
 const FALLBACK_IMAGE = 'https://images.pexels.com/photos/27575174/pexels-photo-27575174.jpeg?auto=compress&cs=tinysrgb&w=700';
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
+// Products with a stock value at or below this number are flagged as low stock.
+const LOW_STOCK_THRESHOLD = 1;
+
+function isLowStock(stock) {
+  return Number(stock) <= LOW_STOCK_THRESHOLD;
+}
+
+// Renders the stock value plus a status badge. Low/sold-out stock is shown in
+// red with a "Low Stock" badge; otherwise a neutral "In Stock" badge is shown.
+function stockCellMarkup(stock) {
+  const value = Number(stock);
+  const low = isLowStock(value);
+  const badge = low
+    ? '<span class="stock-badge low-stock">Low Stock</span>'
+    : '<span class="stock-badge">In Stock</span>';
+  return `<span class="stock-value ${low ? 'low' : ''}">${value}</span> ${badge}`;
+}
+
 function supabaseBucket() {
   return window.SSD_CONFIG?.SUPABASE_BUCKET || 'saree_images';
 }
@@ -203,12 +221,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const authOk = await checkAuth();
     if (!authOk) return;
     try {
-      const { data, error } = await window.supabaseClient.from('products').select('*');
+const { data, error } = await window.supabaseClient.from('products').select('*');
       if (error) throw new Error(error.message);
       const products = data || [];
       const totalProducts = products.length;
       const categories = [...new Set(products.map((product) => product.category).filter(Boolean))].length;
-      const lowStock = products.filter((product) => Number(product.stock) <= 5).length;
+      const lowStock = products.filter((product) => isLowStock(product.stock)).length;
       document.querySelectorAll('.stat-card strong')[0].textContent = totalProducts;
       document.querySelectorAll('.stat-card strong')[1].textContent = categories;
       document.querySelectorAll('.stat-card strong')[2].textContent = lowStock;
@@ -221,7 +239,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               <h4>${product.name}</h4>
               <p>${product.category || 'Uncategorized'}</p>
             </div>
-            <span class="stock-badge ${Number(product.stock) <= 5 ? 'low' : ''}">${Number(product.stock) > 0 ? 'In Stock' : 'Out of Stock'}</span>
+            <span class="stock-value ${isLowStock(product.stock) ? 'low' : ''}">Stock: ${Number(product.stock)}</span>
+            <span class="stock-badge ${isLowStock(product.stock) ? 'low-stock' : ''}">${isLowStock(product.stock) ? 'Low Stock' : 'In Stock'}</span>
           </div>
         `).join('');
       }
@@ -243,11 +262,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const products = data || [];
       tbody.innerHTML = products.map((product) => `
         <tr>
-          <td>${productImageUrls(product)[0] ? `<img src="${productImageUrls(product)[0]}" alt="${product.name}" class="table-image" onerror="handleImageError(this)" />` : '<div class="product-thumb small">P</div>'}</td>
+<td>${productImageUrls(product)[0] ? `<img src="${productImageUrls(product)[0]}" alt="${product.name}" class="table-image" onerror="handleImageError(this)" />` : '<div class="product-thumb small">P</div>'}</td>
           <td>${product.name}</td>
           <td>${product.category}</td>
           <td>₹${Number(product.price).toLocaleString('en-IN')}</td>
-          <td>${product.stock}</td>
+          <td>${stockCellMarkup(product.stock)}</td>
           <td>
             <div class="action-group">
               <a href="edit-product.html?id=${product.id}" class="btn btn-secondary"><i class="fa-solid fa-pen"></i> Edit</a>
