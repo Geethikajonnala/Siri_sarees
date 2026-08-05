@@ -78,23 +78,22 @@ function ssdPublicSiteBaseUrl() {
   return "";
 }
 
-// Links to the pre-generated static page for this product (see
-// scripts/generate-product-pages.mjs) rather than product.html?id=... --
-// that's a real per-product HTML file with the correct title/description/
-// image already baked in, so WhatsApp/Facebook/Google see the right preview
-// even though their crawlers don't run JavaScript.
+// Every product, UUID or not, opens through the single always-deployed
+// product.html page which loads the product client-side from Supabase via
+// the ?id= query parameter (see product.js). We deliberately do NOT link to
+// pre-generated static pages under products/<id>.html: those files are only
+// created by manually running scripts/generate-product-pages.mjs and
+// committing them, so any product added after that run would point to a file
+// that doesn't exist on GitHub Pages and 404. GitHub Pages serves only the
+// committed static files and cannot generate a page on demand.
 //
-// Only products with a UUID id have a generated static page under
-// products/<id>.html. Non-UUID ids (e.g. the fallback product list in
-// script.js) and any DB product added after the last generate-product-pages
-// run have no static file, so linking to products/<id>.html would 404 on
-// GitHub Pages. Fall back to product.html?id=<id> for those -- it's a real
-// deployed page that loads the product client-side.
+// Routing everything through product.html?id=<id> means newly added products
+// work immediately after deployment with no manual page generation. The same
+// canonical/OG/WhatsApp links are all derived from this single helper, so
+// sharing, SEO, wishlist, cart, and similar-product navigation stay in sync.
 function ssdProductUrl(productId) {
   const base = `${ssdPublicSiteBaseUrl()}/`;
   if (!productId) return new URL("product.html", base).href;
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(productId));
-  if (isUuid) return new URL(`products/${encodeURIComponent(productId)}.html`, base).href;
   return new URL(`product.html?id=${encodeURIComponent(productId)}`, base).href;
 }
 
