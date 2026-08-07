@@ -5,7 +5,7 @@ window.SSD_CONFIG = {
   PUBLIC_SITE_URL: "https://sirisareedivine.com",
 
   // Store Owner's WhatsApp Number (International format without '+' prefix or spaces)
-  WHATSAPP_NUMBER: "918019655336",
+  WHATSAPP_NUMBER: "918125945507",
 
   // Supabase project (Settings > API in the Supabase dashboard).
   // SUPABASE_ANON_KEY is the public "anon" key -- safe to expose in frontend

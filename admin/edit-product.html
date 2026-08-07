@@ -58,7 +58,11 @@
               </label>
               <label>
                 Price
-                <input type="number" name="price" placeholder="0" step="0.01" required />
+                <input type="number" name="price" placeholder="0" step="1" min="0" required />
+              </label>
+              <label>
+                Final Price
+                <input type="number" name="final_price" placeholder="Same as price" step="1" min="0" />
               </label>
               <label>
                 Stock
@@ -66,14 +70,11 @@
               </label>
             </div>
 
+            <p class="discount-preview" id="discountPreview">Enter price to see discount</p>
+
             <label>
               Description
               <textarea rows="4" name="description" placeholder="Describe the product"></textarea>
-            </label>
-
-            <label>
-              Offer
-              <input type="text" name="offer" placeholder="e.g. 10% off" />
             </label>
 
             <p class="image-upload-label">Product Images

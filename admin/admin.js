@@ -23,6 +23,38 @@ function supabaseBucket() {
   return window.SSD_CONFIG?.SUPABASE_BUCKET || 'saree_images';
 }
 
+// Wires the live "Final Price" -> discount % preview shared by the add and
+// edit product forms. Price/final price are always whole rupees (no paise).
+function wirePriceDiscountPreview(form) {
+  const priceInput = form.querySelector('[name="price"]');
+  const finalPriceInput = form.querySelector('[name="final_price"]');
+  const preview = form.querySelector('#discountPreview');
+  if (!priceInput || !finalPriceInput || !preview) return;
+
+  const update = () => {
+    const price = Math.round(Number(priceInput.value) || 0);
+    if (!price) {
+      preview.textContent = 'Enter price to see discount';
+      preview.classList.remove('active');
+      return;
+    }
+    const rawFinal = finalPriceInput.value.trim();
+    const finalPrice = rawFinal === '' ? price : Math.round(Number(rawFinal) || 0);
+    if (finalPrice >= price) {
+      preview.textContent = `No discount — selling at Rs ${price.toLocaleString('en-IN')}`;
+      preview.classList.remove('active');
+      return;
+    }
+    const discount = Math.round((1 - finalPrice / price) * 100);
+    preview.textContent = `${discount}% OFF — Rs ${price.toLocaleString('en-IN')} cut to Rs ${finalPrice.toLocaleString('en-IN')}`;
+    preview.classList.add('active');
+  };
+
+  priceInput.addEventListener('input', update);
+  finalPriceInput.addEventListener('input', update);
+  update();
+}
+
 // Downscales + re-encodes a picked photo before upload so the site never
 // serves multi-MB camera/phone originals to visitors. Falls back to the
 // original file if compression fails or doesn't actually save space.
@@ -336,6 +368,7 @@ const { data, error } = await window.supabaseClient.from('products').select('*')
       fileInput: document.querySelector('#slotFileInput'),
       hint: document.querySelector('#imageSlotHint')
     });
+    wirePriceDiscountPreview(addProductForm);
 
     addProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -344,10 +377,14 @@ const { data, error } = await window.supabaseClient.from('products').select('*')
       try {
         const name = addProductForm.querySelector('[name="name"]').value.trim();
         const category = addProductForm.querySelector('[name="category"]').value.trim();
-        const price = Number(addProductForm.querySelector('[name="price"]').value);
+        const price = Math.round(Number(addProductForm.querySelector('[name="price"]').value) || 0);
+        const finalPriceRaw = addProductForm.querySelector('[name="final_price"]').value.trim();
+        const finalPrice = finalPriceRaw === '' ? price : Math.round(Number(finalPriceRaw) || 0);
         const stock = Number(addProductForm.querySelector('[name="stock"]').value);
         if (!name || !category) throw new Error('Name and category are required');
         if (!(price > 0)) throw new Error('Price must be greater than zero');
+        if (finalPrice < 0) throw new Error('Final price cannot be negative');
+        if (finalPrice > price) throw new Error('Final price cannot be greater than price');
         if (!(stock >= 0)) throw new Error('Stock cannot be negative');
 
         const imageUrl = await imageSlots.resolveImageUrl();
@@ -357,8 +394,8 @@ const { data, error } = await window.supabaseClient.from('products').select('*')
           name,
           category,
           description: addProductForm.querySelector('[name="description"]').value.trim(),
-          offer: addProductForm.querySelector('[name="offer"]').value.trim(),
           price,
+          final_price: finalPrice,
           stock,
           image_url: imageUrl,
           created_at: nowIso,
@@ -408,6 +445,7 @@ const { data, error } = await window.supabaseClient.from('products').select('*')
         showMessage(document.querySelector('.form-status'), error.message, 'error');
       }
     }
+    wirePriceDiscountPreview(editProductForm);
 
     editProductForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -415,9 +453,13 @@ const { data, error } = await window.supabaseClient.from('products').select('*')
       const messageTarget = document.querySelector('.form-status');
       setLoading(submitButton, true);
       try {
-        const price = Number(editProductForm.querySelector('[name="price"]').value);
+        const price = Math.round(Number(editProductForm.querySelector('[name="price"]').value) || 0);
+        const finalPriceRaw = editProductForm.querySelector('[name="final_price"]').value.trim();
+        const finalPrice = finalPriceRaw === '' ? price : Math.round(Number(finalPriceRaw) || 0);
         const stock = Number(editProductForm.querySelector('[name="stock"]').value);
         if (!(price > 0)) throw new Error('Price must be greater than zero');
+        if (finalPrice < 0) throw new Error('Final price cannot be negative');
+        if (finalPrice > price) throw new Error('Final price cannot be greater than price');
         if (!(stock >= 0)) throw new Error('Stock cannot be negative');
 
         const imageUrl = await imageSlots.resolveImageUrl();
@@ -425,8 +467,8 @@ const { data, error } = await window.supabaseClient.from('products').select('*')
           name: editProductForm.querySelector('[name="name"]').value.trim(),
           category: editProductForm.querySelector('[name="category"]').value.trim(),
           description: editProductForm.querySelector('[name="description"]').value.trim(),
-          offer: editProductForm.querySelector('[name="offer"]').value.trim(),
           price,
+          final_price: finalPrice,
           stock,
           image_url: imageUrl,
           updated_at: new Date().toISOString()

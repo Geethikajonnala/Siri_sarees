@@ -502,6 +502,17 @@ textarea {
   color: var(--muted);
 }
 
+.discount-preview {
+  margin: -8px 0 16px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.discount-preview.active {
+  color: var(--success);
+}
+
 .image-slot-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

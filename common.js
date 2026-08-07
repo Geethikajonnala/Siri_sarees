@@ -42,14 +42,26 @@ function ssdFormatPrice(value) {
   return `Rs. ${Number(value || 0).toLocaleString("en-IN")}`;
 }
 
-// Reads the admin-entered "offer" field (e.g. "10", "10%", "10% off") as a
-// percentage discount and derives the cut-off original price + final price.
+// Admins set price + final_price directly (both whole rupees); the discount
+// percentage shown to customers is always derived from the two, rounded, so
+// it can never drift out of sync with what's actually charged.
 function ssdPriceBreakdown(product) {
-  const original = Number(product.price) || 0;
-  const offerText = (product.offer || "").toString().trim();
-  const match = offerText.match(/(\d+(\.\d+)?)/);
-  const discountPercent = match ? Math.min(90, Math.max(0, Number(match[1]))) : 0;
-  const final = discountPercent > 0 ? Math.round(original * (1 - discountPercent / 100)) : original;
+  const original = Math.round(Number(product.price) || 0);
+  const rawFinal = Number(product.final_price);
+  let final = original;
+
+  if (rawFinal > 0 && rawFinal < original) {
+    final = Math.round(rawFinal);
+  } else if (!(rawFinal > 0)) {
+    // Legacy fallback for products saved before final_price existed, which
+    // only have the old free-text "offer" field (e.g. "10% off").
+    const offerText = (product.offer || "").toString().trim();
+    const match = offerText.match(/(\d+(\.\d+)?)/);
+    const legacyPercent = match ? Math.min(90, Math.max(0, Number(match[1]))) : 0;
+    if (legacyPercent > 0) final = Math.round(original * (1 - legacyPercent / 100));
+  }
+
+  const discountPercent = final < original ? Math.round((1 - final / original) * 100) : 0;
   return { original, final, discountPercent };
 }
 
@@ -133,7 +145,7 @@ function ssdProductUrl(productId) {
 }
 
 function ssdWhatsAppNumber() {
-  return window.SSD_CONFIG?.WHATSAPP_NUMBER || "918019655336";
+  return window.SSD_CONFIG?.WHATSAPP_NUMBER || "918125945507";
 }
 
 function ssdOpenWhatsApp(message) {
