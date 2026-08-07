@@ -23,6 +23,31 @@ function supabaseBucket() {
   return window.SSD_CONFIG?.SUPABASE_BUCKET || 'saree_images';
 }
 
+// Downscales + re-encodes a picked photo before upload so the site never
+// serves multi-MB camera/phone originals to visitors. Falls back to the
+// original file if compression fails or doesn't actually save space.
+async function compressImage(file, { maxDimension = 1920, quality = 0.82 } = {}) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    let { width, height } = bitmap;
+    if (width > maxDimension || height > maxDimension) {
+      const scale = maxDimension / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+  } catch {
+    return file;
+  }
+}
+
 function handleImageError(imgEl) {
   if (!imgEl || imgEl.dataset.fallbackApplied) return;
   imgEl.dataset.fallbackApplied = 'true';
@@ -111,16 +136,18 @@ function setupImageSlots({ grid, fileInput, hint, initialImages = [] }) {
     }
   });
 
-  fileInput.addEventListener('change', () => {
+  fileInput.addEventListener('change', async () => {
     const file = fileInput.files[0];
     if (!file || pendingIndex === null) return;
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       alert('Only JPG, PNG, and WEBP images are supported');
       return;
     }
-    if (slots[pendingIndex]?.type === 'new') URL.revokeObjectURL(slots[pendingIndex].previewUrl);
-    slots[pendingIndex] = { type: 'new', file, previewUrl: URL.createObjectURL(file) };
+    const targetIndex = pendingIndex;
     pendingIndex = null;
+    const compressed = await compressImage(file);
+    if (slots[targetIndex]?.type === 'new') URL.revokeObjectURL(slots[targetIndex].previewUrl);
+    slots[targetIndex] = { type: 'new', file: compressed, previewUrl: URL.createObjectURL(compressed) };
     render();
   });
 

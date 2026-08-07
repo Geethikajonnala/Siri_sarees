@@ -260,12 +260,14 @@ function productCard(product) {
   const orderLabel = stock.disabled ? "Out of Stock" : '<i class="fa-brands fa-whatsapp"></i> Order Now';
   return `
     <article class="product-card reveal visible" data-id="${product.id}" tabindex="0" aria-label="View ${name}">
-      ${offerBadge}
-      ${stockBadge}
-      <button class="wishlist-btn ${wished ? "active" : ""}" type="button" data-wishlist="${product.id}" aria-label="${wished ? "Remove" : "Add"} ${name} ${wished ? "from" : "to"} wishlist">
-        <i class="${wished ? "fa-solid" : "fa-regular"} fa-heart"></i>
-      </button>
-      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
+      <div class="product-media">
+        ${stockBadge}
+        ${offerBadge}
+        <button class="wishlist-btn ${wished ? "active" : ""}" type="button" data-wishlist="${product.id}" aria-label="${wished ? "Remove" : "Add"} ${name} ${wished ? "from" : "to"} wishlist">
+          <i class="${wished ? "fa-solid" : "fa-regular"} fa-heart"></i>
+        </button>
+        <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
+      </div>
       <div class="product-info">
         <p class="product-category">${product.category || "Siri Saree Divine"}</p>
         <h3>${name}</h3>
@@ -361,7 +363,7 @@ function renderWishlist() {
     const name = product.name || "Siri Saree";
     return `
     <div class="panel-item">
-      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
       <div>
         <h3>${name}</h3>
         <p>${product.category || "Siri Saree Divine"}</p>
@@ -386,7 +388,7 @@ function renderCart() {
     const name = product.name || "Siri Saree";
     return `
     <div class="panel-item cart-item">
-      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
       <div>
         <h3>${name}</h3>
         <p>Quantity: ${quantity}</p>
@@ -464,7 +466,7 @@ const thumbnailsMarkup = quickViewImages.length > 1
       <div class="quick-image-thumbs" aria-label="Product images">
         ${quickViewImages.map((url, index) => `
           <button class="quick-image-thumb ${index === 0 ? "active" : ""}" type="button" data-quick-index="${index}" aria-label="View image ${index + 1}" aria-pressed="${index === 0 ? "true" : "false"}">
-            <img src="${url}" alt="${name} thumbnail ${index + 1}" onerror="ssdImageError(this)">
+            <img src="${url}" alt="${name} thumbnail ${index + 1}" loading="lazy" onerror="ssdImageError(this)">
           </button>
         `).join("")}
       </div>

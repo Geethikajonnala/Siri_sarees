@@ -69,7 +69,7 @@ async function renderWishlist() {
     const name = product.name || "Siri Saree";
     return `
     <div class="panel-item">
-      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
       <div>
         <h3>${name}</h3>
         <p>${product.category || "Siri Saree Divine"}</p>
@@ -96,7 +96,7 @@ async function renderCart() {
     const name = product.name || "Siri Saree";
     return `
     <div class="panel-item cart-item">
-      <img src="${imageUrl}" alt="${name}" onerror="ssdImageError(this)">
+      <img src="${imageUrl}" alt="${name}" loading="lazy" onerror="ssdImageError(this)">
       <div>
         <h3>${name}</h3>
         <p>Quantity: ${quantity}</p>
@@ -242,10 +242,18 @@ function renderSimilarProducts(products) {
   section.hidden = false;
 }
 
+// Warms the browser cache for gallery images the visitor hasn't looked at
+// yet. Skips images[0] (already loading via the visible <img>) and waits
+// until the browser is idle so this never competes with the main image.
 function preloadImages(images) {
-  images.forEach((url) => {
-    const preloadEl = new Image();
-    preloadEl.src = url;
+  const rest = images.slice(1);
+  if (rest.length === 0) return;
+  const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 200));
+  schedule(() => {
+    rest.forEach((url) => {
+      const preloadEl = new Image();
+      preloadEl.src = url;
+    });
   });
 }
 
@@ -273,7 +281,7 @@ function galleryMarkup(images, name) {
 
   const thumbs = images.map((url, index) => `
     <button class="product-gallery-thumb ${index === 0 ? "active" : ""}" type="button" data-gallery-index="${index}" aria-label="View image ${index + 1}" aria-pressed="${index === 0 ? "true" : "false"}">
-      <img src="${url}" alt="${name} thumbnail ${index + 1}" onerror="ssdImageError(this)">
+      <img src="${url}" alt="${name} thumbnail ${index + 1}" loading="lazy" onerror="ssdImageError(this)">
     </button>
   `).join("");
 

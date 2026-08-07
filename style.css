@@ -429,6 +429,10 @@ button {
   position: relative;
 }
 
+.product-media {
+  position: relative;
+}
+
 .product-card img {
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -1329,6 +1333,12 @@ button {
     font-size: 0.62rem;
   }
 
+  .product-media .offer-badge {
+    top: auto;
+    bottom: 8px;
+    left: 8px;
+  }
+
   .section {
     padding-right: 16px;
     padding-left: 16px;
@@ -1463,6 +1473,15 @@ button {
   margin-left: 8px;
   box-shadow: none;
   vertical-align: middle;
+}
+
+/* On product-grid cards the offer badge shares the image with the stock
+   badge (top-left) and wishlist button (top-right), so it moves to the
+   bottom-left corner to avoid overlapping either. */
+.product-media .offer-badge {
+  top: auto;
+  bottom: 14px;
+  left: 14px;
 }
 
 /* Stock status badges (shared by product cards, quick view, and details page).
